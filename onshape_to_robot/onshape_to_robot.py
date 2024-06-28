@@ -9,6 +9,8 @@ import hashlib
 from . import csg
 from .robot_description import RobotURDF, RobotSDF
 
+from .mjcf import create_mjcf
+
 
 partNames = {}
 
@@ -195,14 +197,16 @@ def main():
 
     def buildRobot(tree, matrix):
         occurrence = getOccurrence([tree['id']])
+        # print(f"buildRobot::occurrence::{occurrence}")
         instance = occurrence['instance']
+        # print(f"buildRobot::instance::{instance}")
         print(Fore.BLUE + Style.BRIGHT +
             '* Adding top-level instance ['+instance['name']+']' + Style.RESET_ALL)
 
         # Build a part name that is unique but still informative
         link = processPartName(
             instance['name'], instance['configuration'], occurrence['linkName'])
-
+        # print(f"buildRobot::link::{link}")
         # Create the link, collecting all children in the tree assigned to this top-level part
         robot.startLink(link, matrix)
         for occurrence in occurrences.values():
@@ -217,7 +221,7 @@ def main():
                     frame = getOccurrence(partOrFrame)['transform']
                 else:
                     frame = partOrFrame
-                
+
                 if robot.relative:
                     frame = np.linalg.inv(matrix)*frame
                 robot.addFrame(name, frame)
@@ -249,7 +253,10 @@ def main():
     # Start building the robot
     buildRobot(tree, np.matrix(np.identity(4)))
     robot.finalize()
-    # print(tree)
+    # print(f"tree::{tree}")
+    # print(f"tree::keys::{tree.keys()}")
+    create_mjcf(tree)
+
 
     print("\n" + Style.BRIGHT + "* Writing " +
         robot.ext.upper()+" file" + Style.RESET_ALL)
