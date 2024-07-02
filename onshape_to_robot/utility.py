@@ -1,10 +1,12 @@
 from typing import List,Dict,Any
-from .components import Body,Geom,Joint,Inertia,BodyElements
+from .components import (Body,Geom,Joint,Inertia,
+                        BodyElements,
+                        MujocoGraphState)
 import math
 import numpy as np
 from .load_robot import \
      config, client, tree, occurrences, getOccurrence, frames
-
+from uuid import uuid4,UUID
 
 
 ####### copied form onshape_to_robot.py #############
@@ -279,7 +281,7 @@ def get_body(tree)->(dict,dict):
     return body_dic,children
 
 
-def dict_to_tree(tree: Dict[str, Any]) -> Body:
+def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
     """Converts a dictionary representation of a tree into a Node structure."""
     # getting general info
     id = tree['id']
@@ -295,10 +297,12 @@ def dict_to_tree(tree: Dict[str, Any]) -> Body:
 
     geom = Geom(
         name = "justPart",
-        pos = xyz,
-        euler = rpy,
+        pos = tuple(xyz),
+        euler = tuple(rpy),
         mesh = justPart
     )
+
+    graph_state.geom_state.add(geom.to_dict())
 
     # getting inertia
     mass,i_matrix = get_inetia_prop(prefix,part)
@@ -311,19 +315,22 @@ def dict_to_tree(tree: Dict[str, Any]) -> Body:
     # getting joint if any
     joint= None
     # print(f"dof_name in tree.keys()::{'dof_name' in tree.keys()}")
+    # print(f"dict_to_tree::uuid4()::{uuid4()}")
     if 'dof_name' in tree.keys():
         joint = Joint(
             name = tree["dof_name"],
             j_type=tree["jointType"],
             j_range=tree["jointLimits"],
-            axis=tree["z_axis"]
+            axis=tuple(tree["z_axis"].tolist()),
+            id = uuid4()
 
         )
+        graph_state.joint_state.add(joint.to_dict())
     body_elem = BodyElements(inertia,geom,joint)
 
     node = Body(prop=body_elem)
 
     for child in tree.get('children', []):
-        child_node = dict_to_tree(child)
+        child_node = dict_to_tree(child,graph_state)
         node.add_child(child_node)
     return node
