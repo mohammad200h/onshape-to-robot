@@ -131,7 +131,7 @@ def create_mjcf(tree:dict)->str:
 
     # Remove the XML declaration
     pretty_xml_as_string = '\n'.join(pretty_xml_as_string.split('\n')[1:])
-    print(pretty_xml_as_string)
+    # print(pretty_xml_as_string)
 
 
     file_path = 'model.xml'

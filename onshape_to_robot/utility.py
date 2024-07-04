@@ -1,12 +1,24 @@
 from typing import List,Dict,Any
 from .components import (Body,Geom,Joint,Inertia,
                         BodyElements,
+                        Material,
                         MujocoGraphState)
 import math
 import numpy as np
 from .load_robot import \
      config, client, tree, occurrences, getOccurrence, frames
 from uuid import uuid4,UUID
+
+import requests
+
+
+#####color api########
+def get_color_name(rgb):
+    url = f"https://www.thecolorapi.com/id?rgb=rgb({rgb[0]},{rgb[1]},{rgb[2]})"
+    response = requests.get(url)
+    data = response.json()
+    print(f"get_color_name::name::{data['name']['value']}")
+    return data['name']['value']
 
 
 ####### copied form onshape_to_robot.py #############
@@ -164,6 +176,25 @@ def extractPartName(name, configuration):
         parts += ['_' + configuration.replace('=', '_').replace(' ', '_')]
     return basePartName, '_'.join(parts).lower()
 
+
+def get_color(part):
+    # Obtain metadatas about part to retrieve color
+    if config['color'] is not None:
+        color = config['color']
+    else:
+        metadata = client.part_get_metadata(
+            part['documentId'], part['documentMicroversion'], part['elementId'], part['partId'], part['configuration'])
+        color = [0.5, 0.5, 0.5]
+        # XXX: There must be a better way to retrieve the part color
+        for entry in metadata['properties']:
+            if 'value' in entry and type(entry['value']) is dict and 'color' in entry['value']:
+                rgb = entry['value']['color']
+                color = np.array(
+                    [rgb['red'], rgb['green'], rgb['blue']])/255.0
+
+    return color.tolist()+[1]
+
+
 ######## END::copied form onshape_to_robot.py ##########
 
 def pos_form_trasform(transform):
@@ -223,7 +254,6 @@ def get_inetia_prop(prefix,part):
 
     return mass,inertia
 
-
 def get_body(tree)->(dict,dict):
     """
     input:tree
@@ -280,7 +310,6 @@ def get_body(tree)->(dict,dict):
 
     return body_dic,children
 
-
 def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
     """Converts a dictionary representation of a tree into a Node structure."""
     # getting general info
@@ -295,11 +324,25 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
     instance['name'], instance['configuration'], occurrence['linkName'])
     justPart, prefix,part = getMeshName(occurrence)
 
+    graph_state.assets.add_mesh(justPart+".stl")
+
+    rgba = get_color(part)
+    print(f"dict_to_tree::rgba::type::{type(rgba)}")
+    c_name = get_color_name(rgba)
+
+    # print(f"dict_to_tree::color::{color}")
+    graph_state.assets.add_material(c_name,rgba)
+
+
+
     geom = Geom(
         name = "justPart",
         pos = tuple(xyz),
         euler = tuple(rpy),
-        mesh = justPart
+        mesh = justPart,
+        material = Material(
+            name = c_name,
+            rgba = rgba)
     )
 
     graph_state.geom_state.add(geom.to_dict(),geom)

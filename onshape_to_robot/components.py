@@ -89,7 +89,7 @@ class Tree:
         # assign class to element
         for n_default in self.named_defaults:
             if n_default.element_type =="joint":
-                    print(f"refactor::n_default::joint::n_default.name::{n_default.name}")
+                    # print(f"refactor::n_default::joint::n_default.name::{n_default.name}")
                     for elem in n_default.elements:
                         # print(f"refactor::elem::before::{elem}")
                         elem.set_attrib(
@@ -113,11 +113,13 @@ class Tree:
                         )
 
     def xml(self):
+        asset_xml = self.state.assets.xml()
         default_xml = self.default_xml()
         body_xml = self.root.xml()
 
         mj_xml = (
             "<mujoco model='robot'>"
+            f"{asset_xml}"
             f"{default_xml}"
             f"{body_xml}"
             "</mujoco>"
@@ -126,7 +128,7 @@ class Tree:
         return mj_xml
 
     def default_xml(self):
-        print(f"default_xml::called")
+        # print(f"default_xml::called")
         # print("Tree::default_xml::called")
         #super default
         super_defaults = ""
@@ -141,7 +143,7 @@ class Tree:
         # namded defaults
         named_defaults=""
         for n_default in self.named_defaults:
-            print(f"default_xml::n_default::{n_default}")
+            # print(f"default_xml::n_default::{n_default}")
             if n_default.element_type =="joint":
                     xml = f"<joint class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
                     named_defaults +=xml
@@ -183,14 +185,39 @@ class Mesh:
 @dataclass
 class Material:
     # 'm' stands for material this is to not cofilict with keyword class
-    m_class: str
     name:str
     rgba: List[float]
 
 @dataclass
 class Assets:
-    materials: List[Material]
-    meshes:List[Mesh]
+    materials: List[Material] = field(default_factory=list)
+    meshes:List[Mesh] = field(default_factory=list)
+
+    def add_mesh(self,m):
+        self.meshes.append(m)
+
+    def add_material(self,name,rgba):
+        m = Material(name,rgba)
+        self.materials.append(m)
+
+    def xml(self):
+        # TODO : add material
+        meshes = ""
+        material= ""
+        for m in self.meshes:
+            meshes += f" <mesh file='{m}'/>"
+        print(f"Assets::xml::materials::{self.materials}")
+        for m in self.materials:
+            material += f" <material name='{m.name}' rgba='{to_str(m.rgba)}'/>"
+
+        asset = (
+            "<asset>"
+                f"{meshes}"
+                f"{material}"
+            "</asset>"
+        )
+        # print(f"Assets::xml::meshes::{self.meshes}")
+        return asset
 
 @dataclass
 class Joint:
@@ -255,7 +282,7 @@ class Geom:
             self.id:{
                 "name":self.name,
                 "type":self.g_type,
-                "material":self.material,
+                "material":self.material.name,
                 "pos":self.pos,
                 "euler":self.euler,
                 "mesh":self.mesh,
@@ -270,7 +297,7 @@ class Geom:
         elif attrib == "type":
             self.g_type = value
         elif attrib == "material":
-            self.material = value
+            self.material.name = value
         elif attrib == "pos":
             self.pos = value
         elif attrib == "euler":
@@ -425,8 +452,7 @@ class MujocoGraphState:
     joint_state = ElementState()
     geom_state  = ElementState()
     # used for asset managment
-    meshes = List[Mesh]
-    materials = List[Material]
+    assets = Assets()
 
 
 def refactor_joint(tree:Body,graph_state:MujocoGraphState):
