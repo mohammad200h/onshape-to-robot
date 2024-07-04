@@ -302,7 +302,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
         mesh = justPart
     )
 
-    graph_state.geom_state.add(geom.to_dict())
+    graph_state.geom_state.add(geom.to_dict(),geom)
 
     # getting inertia
     mass,i_matrix = get_inetia_prop(prefix,part)
@@ -325,7 +325,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
             id = uuid4()
 
         )
-        graph_state.joint_state.add(joint.to_dict())
+        graph_state.joint_state.add(joint.to_dict(),joint)
     body_elem = BodyElements(inertia,geom,joint)
 
     node = Body(prop=body_elem)

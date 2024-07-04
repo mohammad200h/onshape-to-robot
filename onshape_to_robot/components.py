@@ -13,8 +13,6 @@ def all_ids_match(list1, list2):
     return s1==s2
 
 
-
-
 class AngleType(Enum):
     RADIAN = "radian"
     DEGREE = "degree"
@@ -22,9 +20,16 @@ class AngleType(Enum):
 class TrackingMode(Enum):
     TrackCom = "trackcom"
 
-
 def to_str(input:List[float])->str:
     return ' '.join(map(str, input))
+
+@dataclass
+class Default:
+    name:str
+    # TODO: change the type of element from str to Enum: geom, joint
+    element_type:str
+    attrbutes:List[Tuple[str,Any]]
+    elements:List[object]
 
 @dataclass
 class Node:
@@ -39,9 +44,135 @@ class Node:
 
 @dataclass
 class Tree:
+    """
+    <defult>
+        <joint range="-0.1 0.1" type="hinge"/>
+        <geom type="mesh"/>
+    </defult>
+    """
+    super_defaults:List[Default]
+    """
+     <defult>
+        <defult class="joint1">
+            <joint range="-0.5 0.5"/>
+        </defult>
+        <defult class="joint2">
+            <joint range="-0.7 0.2"/>
+        </defult>
+        <defult class="geom1">
+            <geom type="box" size="1 1 1"/>
+        </defult>
+    </defult>
+    """
+    named_defaults:List[Default]
     root:Node
     state:object
 
+    def refactor(self):
+        # remove attrbutes covered by the supper default
+        for s_default in self.super_defaults:
+            if s_default.element_type =="joint":
+                for t in s_default.attrbutes:
+                    for elem in s_default.elements:
+                        elem.set_attrib(
+                            attrib=t[0],
+                            value = None
+                        )
+            elif s_default.element_type =="geom":
+                for t in s_default.attrbutes:
+                    for elem in s_default.elements:
+                        elem.set_attrib(
+                            attrib=t[0],
+                            value = None
+                        )
+        # remove attrbiutes convered by named default and
+        # assign class to element
+        for n_default in self.named_defaults:
+            if n_default.element_type =="joint":
+                    print(f"refactor::n_default::joint::n_default.name::{n_default.name}")
+                    for elem in n_default.elements:
+                        # print(f"refactor::elem::before::{elem}")
+                        elem.set_attrib(
+                            attrib= n_default.attrbutes[0],
+                            value = None
+                        )
+                        elem.set_attrib(
+                                attrib="class",
+                                value = n_default.name
+                        )
+                    # print(f"refactor::elem::after::{elem}")
+            elif n_default.element_type =="geom":
+                    for elem in n_default.elements:
+                        elem.set_attrib(
+                            attrib= n_default.attrbutes[0],
+                            value = None
+                        )
+                        elem.set_attrib(
+                                attrib="class",
+                                value = n_default.name
+                        )
+
+    def xml(self):
+        default_xml = self.default_xml()
+        body_xml = self.root.xml()
+
+        mj_xml = (
+            "<mujoco model='robot'>"
+            f"{default_xml}"
+            f"{body_xml}"
+            "</mujoco>"
+        )
+
+        return mj_xml
+
+    def default_xml(self):
+        print(f"default_xml::called")
+        # print("Tree::default_xml::called")
+        #super default
+        super_defaults = ""
+        for s_default in self.super_defaults:
+            if s_default.element_type =="joint":
+                    xml = f"<joint {self.super_default_attributes_str(s_default.attrbutes)} />\n"
+                    super_defaults +=xml
+            elif s_default.element_type =="geom":
+                    xml = f"<geom {self.super_default_attributes_str(s_default.attrbutes)} />\n"
+                    super_defaults +=xml
+
+        # namded defaults
+        named_defaults=""
+        for n_default in self.named_defaults:
+            print(f"default_xml::n_default::{n_default}")
+            if n_default.element_type =="joint":
+                    xml = f"<joint class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
+                    named_defaults +=xml
+            elif n_default.element_type =="geom":
+                for elem in n_default.elements:
+                    xml = f"<geom class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
+                    named_defaults +=xml
+
+        xml =(
+            "<default>"
+            f"  {super_defaults}"
+            "   <default>"
+            f"      {named_defaults}"
+            "   </default>"
+            "</default>"
+        )
+        return xml
+
+    def super_default_attributes_str(self,attrbutes):
+        #TODO : implemnet this
+        attr = ""
+        for t in attrbutes:
+            value = to_str(t[1]) if type(t[1])==tuple else t[1]
+            attr += f" {t[0]}='{value}'"
+        return attr
+
+    def named_defaults_attributes_str(self,attrbutes):
+        attr = f""
+        value = to_str(attrbutes[1]) if type(attrbutes[1])==tuple else attrbutes[1]
+        attr += f"{attrbutes[0]}='{value}'"
+        return attr
 
 
 @dataclass
@@ -56,12 +187,10 @@ class Material:
     name:str
     rgba: List[float]
 
-
 @dataclass
 class Assets:
     materials: List[Material]
     meshes:List[Mesh]
-
 
 @dataclass
 class Joint:
@@ -72,14 +201,13 @@ class Joint:
     axis:List[float]
     j_class:str = None
 
-
-
     def xml(self):
         name = f"name='{self.name}'" if self.name !=None else ""
         j_range = f"range='{to_str(self.j_range)}'" if self.j_range !=None else ""
-        axis = f"axis='{to_str(self.axis)}'" if self.axis.any() else ""
+        axis = f"axis='{to_str(self.axis)}'" if self.axis !=None else ""
+        j_class = f"class='{self.j_class}'" if self.j_class !=None else ""
+        return f"<joint {j_class} {name} {j_range} {axis}/>"
 
-        return f"<joint {name} {j_range} {axis}/>"
     def to_dict(self):
         return{
             self.id:{
@@ -90,6 +218,22 @@ class Joint:
                 "class":self.j_class,
             }
         }
+
+    def set_attrib(self,attrib:str,value:Any):
+        # print("Joint::set_attrib::called")
+        # print(f"Joint::set_attrib::attrib::{attrib}")
+        # print(f"Joint::set_attrib::value::{value}")
+
+        if attrib == "name":
+            self.name = value
+        elif attrib == "type":
+            self.j_type = value
+        elif attrib == "range":
+            self.j_range = value
+        elif attrib == "axis":
+            self.axis = value
+        elif attrib == "class":
+            self.j_class = value
 
 @dataclass
 class Geom:
@@ -102,10 +246,10 @@ class Geom:
     g_class: str = None
     id:UUID = uuid4()
 
-
-
     def xml(self):
-        return f"<geom type='mesh' contype='0' conaffinity='0' pos='{to_str(self.pos)}' euler='{to_str(self.euler)}' mesh='{self.mesh}' />"
+        class_xml = f"class='{self.g_class}'" if self.g_class else ""
+        return f"<geom {class_xml} type='mesh' pos='{to_str(self.pos)}' euler='{to_str(self.euler)}' mesh='{self.mesh}' />"
+
     def to_dict(self):
         return {
             self.id:{
@@ -119,6 +263,24 @@ class Geom:
             }
 
         }
+
+    def set_attrib(self,attrib:str,value:Any):
+        if attrib == "name":
+            self.name = value
+        elif attrib == "type":
+            self.g_type = value
+        elif attrib == "material":
+            self.material = value
+        elif attrib == "pos":
+            self.pos = value
+        elif attrib == "euler":
+            self.euler = value
+        elif attrib == "mesh":
+            self.mesh = value
+        elif attrib == "class":
+            self.g_class = value
+
+
 @dataclass
 class Inertia:
     pos:List[float]
@@ -170,8 +332,6 @@ class Body(Node):
 
         return xml
 
-
-
 @dataclass
 class Comiler:
     angle:AngleType
@@ -181,9 +341,6 @@ class Comiler:
 @dataclass
 class Option:
     integrator:str = "implicitfast"
-
-# @dataclass
-# class Default:
 
 @dataclass
 class Camera:
@@ -234,15 +391,23 @@ class Actuator:
 
 @dataclass
 class ElementState:
-    defaults:dict=None
+    defaults:dict = None
+    elements:Dict[UUID,object] = field(default_factory=dict)
     ids:List[UUID] = field(default_factory=list)
     attirbute_groups:List[dict] = field(default_factory=list)
 
-    def add(self,e):
+    def add(self,e,obj):
         id = list(e.keys())[0]
         self.ids.append(id)
         self.attirbute_groups.append(e)
+        self.elements[id]=obj
 
+    def get_element(self,id:UUID):
+        """
+        in : id
+        out: pointer to node given i
+        """
+        return self.elements[id]
 
 @dataclass
 class MujocoGraphState:
@@ -263,19 +428,6 @@ class MujocoGraphState:
     meshes = List[Mesh]
     materials = List[Material]
 
-
-
-"""
-  Thought : I yet dont how to set actuator,Light,Camera,Contact Exclude values from Onshape
-  Possible solutions:
-  https://forum.onshape.com/discussion/5027/ui-feature
-  https://forum.onshape.com/discussion/514/how-to-create-plugins-for-onshape
-  https://cad.onshape.com/FsDoc/uispec.html
-  Onshape app stor: https://www.youtube.com/watch?v=Uvs6HAdb4eA
-  https://forum.onshape.com/discussion/20554/information-on-creating-an-onshape-app
-  How to create an app : https://forum.onshape.com/discussion/5785/question-tuto-how-to-create-an-app
-  https://cad.onshape.com/help/Content/app_store_faqs_And.html
-"""
 
 def refactor_joint(tree:Body,graph_state:MujocoGraphState):
     """
@@ -349,6 +501,8 @@ def refactor_joint(tree:Body,graph_state:MujocoGraphState):
     # print("\n")
     # print(f"unique_model_attribute_and_value_dict_id::{unique_model_attribute_and_value_dict_id}")
 
+    # print(f"unique_model_attribute_and_value_dict_count::after delete::{unique_model_attribute_and_value_dict_count}")
+
     attribiutes_common_in_all_elements =[]
 
 
@@ -367,6 +521,7 @@ def refactor_joint(tree:Body,graph_state:MujocoGraphState):
             if all_ids_match(ids,value):
                 attribiutes_common_in_all_elements.append(key)
 
+    attribiutes_common_in_all_elements_with_ids = (ids,attribiutes_common_in_all_elements)
     # print(f"attribiutes_common_in_all_elements::{attribiutes_common_in_all_elements}")
     # print(f"attribiutes_common_in_all_elements::len::{len(attribiutes_common_in_all_elements)}")
 
@@ -375,15 +530,18 @@ def refactor_joint(tree:Body,graph_state:MujocoGraphState):
     classes = {}
     counter =1
     for key,count in unique_model_attribute_and_value_dict_count.items():
-        if count == num_ids:
+        if count == num_ids or count == 1:
             continue
 
         attribute,value = key
         # print(f"attribute,value ::{attribute},{value}")
-        classes["joint_"+str(counter)] = key
+        ids = unique_model_attribute_and_value_dict_id[key]
+        classes["joint_"+str(counter)] = (ids,key)
         counter +=1
 
-    return attribiutes_common_in_all_elements,classes
+    # print(f"unique_model_attribute_and_value_dict_count::{unique_model_attribute_and_value_dict_count}")
+
+    return attribiutes_common_in_all_elements_with_ids,classes
 
 def refactor_geom(tree:Body,graph_state:MujocoGraphState):
     """
@@ -417,7 +575,7 @@ def refactor_geom(tree:Body,graph_state:MujocoGraphState):
         for key,value in attrib_dic.items():
             if key in model_attrbutes:
                 pair = (key,value)
-                print(f"pair::{pair}")
+                # print(f"pair::{pair}")
                 unique_model_attribute_and_value.add(pair)
     # print(f"unique_model_attribute_and_value::{unique_model_attribute_and_value}")
     # print(f"ids::{ids}")
@@ -457,8 +615,10 @@ def refactor_geom(tree:Body,graph_state:MujocoGraphState):
     # print("\n")
     # print(f"unique_model_attribute_and_value_dict_id::{unique_model_attribute_and_value_dict_id}")
 
-    attribiutes_common_in_all_elements =[]
 
+    # print(f"unique_model_attribute_and_value_dict_count::after delete::{unique_model_attribute_and_value_dict_count}")
+
+    attribiutes_common_in_all_elements =[]
 
     # getting attrbuites shared among all elements
     num_ids = len(ids)
@@ -475,6 +635,7 @@ def refactor_geom(tree:Body,graph_state:MujocoGraphState):
             if all_ids_match(ids,value):
                 attribiutes_common_in_all_elements.append(key)
 
+    attribiutes_common_in_all_elements_with_ids = (ids,attribiutes_common_in_all_elements)
     # print(f"attribiutes_common_in_all_elements::{attribiutes_common_in_all_elements}")
     # print(f"attribiutes_common_in_all_elements::len::{len(attribiutes_common_in_all_elements)}")
 
@@ -483,15 +644,31 @@ def refactor_geom(tree:Body,graph_state:MujocoGraphState):
     classes = {}
     counter =1
     for key,count in unique_model_attribute_and_value_dict_count.items():
-        if count == num_ids:
+        if count == num_ids or count == 1:
             continue
 
         attribute,value = key
         # print(f"attribute,value ::{attribute},{value}")
-        classes["geom_"+str(counter)] = key
+        ids = unique_model_attribute_and_value_dict_id[key]
+        classes["geom_"+str(counter)] = (ids,key)
         counter +=1
 
 
     #remove classes with a single memeber
+    # print(f"attribiutes_common_in_all_elements_with_ids::{attribiutes_common_in_all_elements_with_ids}")
+    # print(f"classes::{classes}")
 
-    return attribiutes_common_in_all_elements,classes
+    return attribiutes_common_in_all_elements_with_ids,classes
+
+"""
+  Thought : I yet dont how to set actuator,Light,Camera,Contact Exclude values from Onshape
+  Possible solutions:
+  https://forum.onshape.com/discussion/5027/ui-feature
+  https://forum.onshape.com/discussion/514/how-to-create-plugins-for-onshape
+  https://cad.onshape.com/FsDoc/uispec.html
+  Onshape app stor: https://www.youtube.com/watch?v=Uvs6HAdb4eA
+  https://forum.onshape.com/discussion/20554/information-on-creating-an-onshape-app
+  How to create an app : https://forum.onshape.com/discussion/5785/question-tuto-how-to-create-an-app
+  https://cad.onshape.com/help/Content/app_store_faqs_And.html
+  msybe builf an app on top of simulate enabling toggling between modeling and simulate
+"""
