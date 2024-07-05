@@ -309,11 +309,11 @@ class Inertia:
     pos:List[float]
     euler:Optional[List[float]]
     mass:float
-    diaginertia:List[float]
+    fullinertia:List[float]
 
 
     def xml(self):
-        return f"<inertial pos='{to_str(self.pos)}' mass='{self.mass}' euler='{to_str(self.euler)}' diaginertia='{to_str(self.diaginertia)}' />"
+        return f"<inertial pos='{to_str(self.pos)}' mass='{self.mass}' euler='{to_str(self.euler)}' fullinertia='{to_str(self.fullinertia)}' />"
 
 @dataclass
 class Site:

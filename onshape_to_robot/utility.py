@@ -12,9 +12,7 @@ from uuid import uuid4,UUID
 import requests
 
 def convert_to_snake_case(s):
-    # Convert to lowercase
     s = s.lower()
-    # Replace spaces with underscores
     s = s.replace(" ", "_")
     return s
 
@@ -360,7 +358,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
         pos= xyz,
         euler=rpy,
         mass = mass,
-        diaginertia=i_matrix
+        fullinertia=i_matrix
     )
     # getting joint if any
     joint= None
