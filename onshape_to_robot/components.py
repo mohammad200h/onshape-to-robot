@@ -119,9 +119,13 @@ class Tree:
 
         mj_xml = (
             "<mujoco model='robot'>"
+            "<compiler angle='radian' autolimits='true'/>"
+	        "<option integrator='implicitfast'/>"
             f"{asset_xml}"
             f"{default_xml}"
+            "<worldbody>"
             f"{body_xml}"
+            "</worldbody>"
             "</mujoco>"
         )
 
@@ -145,18 +149,27 @@ class Tree:
         for n_default in self.named_defaults:
             # print(f"default_xml::n_default::element_type::{n_default.element_type}")
             if n_default.element_type =="joint":
-                    xml = f"<joint class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
+                    xml =(
+                        f"<default class='{n_default.name}'>"
+                        f"  <joint {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
+                        "</default>"
+                    )
+
                     named_defaults +=xml
             elif n_default.element_type =="geom":
-                    xml = f"<geom class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
+                    xml =(
+                        f"<default class='{n_default.name}'>"
+                        f"  <geom  {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
+                        "</default>"
+                        )
+
                     named_defaults +=xml
 
         xml =(
             "<default>"
             f"  {super_defaults}"
-            "   <default>"
-            f"      {named_defaults}"
-            "   </default>"
+            f"  {named_defaults}"
+
             "</default>"
         )
         return xml
@@ -272,7 +285,10 @@ class Geom:
 
     def xml(self):
         class_xml = f"class='{self.g_class}'" if self.g_class else ""
-        return f"<geom {class_xml} type='mesh' pos='{to_str(self.pos)}' euler='{to_str(self.euler)}' mesh='{self.mesh}' />"
+        material_xml = f"material='{self.material.name}'" if self.material else ""
+        print(f"Geom::xml::self.g_class::{self.g_class}")
+
+        return f"<geom {class_xml} type='mesh' pos='{to_str(self.pos)}' euler='{to_str(self.euler)}' mesh='{self.mesh}' {material_xml} />"
 
     def to_dict(self):
         return {
@@ -294,7 +310,8 @@ class Geom:
         elif attrib == "type":
             self.g_type = value
         elif attrib == "material":
-            self.material.name = value
+            print(f"Geom::set_attrib::material::value::{value}")
+            self.material = value
         elif attrib == "pos":
             self.pos = value
         elif attrib == "euler":
@@ -302,7 +319,10 @@ class Geom:
         elif attrib == "mesh":
             self.mesh = value
         elif attrib == "class":
+            print(f"Geom::set_attrib::class::value::{value}")
             self.g_class = value
+            print(f"Geom::set_attrib::class::self.g_class::{self.g_class}")
+            print(f"Geom::set_attrib::class::self.id::{self.id}")
 
 @dataclass
 class Inertia:
@@ -338,9 +358,11 @@ class Body(Node):
 
     def xml(self):
         xml = ""
+        # TODO: Figure out what is wrong with axis of rotation
         joint_xml = self.prop.joint.xml() if self.prop.joint !=None else ""
         geom_xml =  self.prop.geom.xml()
-        intertia_xml = self.prop.inertia.xml()
+        #TODO: figure out what is wrong with inertia
+        # intertia_xml = self.prop.inertia.xml()
         children = ""
         for child in self.children:
             children += child.xml()
@@ -348,7 +370,7 @@ class Body(Node):
         # putting it all together
         xml += "<body>"
         xml += joint_xml
-        xml += intertia_xml
+        # xml += intertia_xml
         xml += geom_xml
         xml += children
         xml += "</body>"

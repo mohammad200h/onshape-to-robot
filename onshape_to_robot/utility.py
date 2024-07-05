@@ -11,6 +11,12 @@ from uuid import uuid4,UUID
 
 import requests
 
+def translate_joint_type_to_mjcf(j_type):
+    mj_j_type = {
+        "revolute":"hinge"
+    }
+    return mj_j_type[j_type]
+
 def convert_to_snake_case(s):
     s = s.lower()
     s = s.replace(" ", "_")
@@ -333,14 +339,16 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
 
     rgba = get_color(part)
     # print(f"dict_to_tree::rgba::type::{type(rgba)}")
-    c_name = get_color_name(rgba)
 
+    c_name = get_color_name(rgba)
+    print(f"c_name::{c_name}")
     # print(f"dict_to_tree::color::{color}")
     graph_state.assets.add_material(c_name,rgba)
 
 
 
     geom = Geom(
+        id = uuid4(),
         name = "justPart",
         pos = tuple(xyz),
         euler = tuple(rpy),
@@ -367,7 +375,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
     if 'dof_name' in tree.keys():
         joint = Joint(
             name = tree["dof_name"],
-            j_type=tree["jointType"],
+            j_type=translate_joint_type_to_mjcf(tree["jointType"]),
             j_range=tree["jointLimits"],
             axis=tuple(tree["z_axis"].tolist()),
             id = uuid4()
