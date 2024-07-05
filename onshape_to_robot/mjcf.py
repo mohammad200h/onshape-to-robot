@@ -89,7 +89,7 @@ def create_mjcf(tree:dict)->str:
         named_defaults.append(
             Default(
                 name=g_class,
-                element_type="joint",
+                element_type="geom",
                 attrbutes = attributes,
                 elements = [
                     mj_state.geom_state.get_element(id) \
@@ -98,7 +98,7 @@ def create_mjcf(tree:dict)->str:
             )
         )
 
-
+    # print(f"named_defaults::{named_defaults}")
     # creating tree
     tree = Tree(
         root = root_body,
@@ -113,7 +113,8 @@ def create_mjcf(tree:dict)->str:
 
     # print("\n\n\n")
 
-    # print(f"tree::named_defaults::{tree.named_defaults}")
+    # for n_default in named_defaults:
+    #     print(f"n_default::name::{n_default.name}")
 
     # print("\n\n")
     # print(f"tree::named_defaults::0::{tree.named_defaults[0]}")

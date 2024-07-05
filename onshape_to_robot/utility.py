@@ -11,14 +11,21 @@ from uuid import uuid4,UUID
 
 import requests
 
+def convert_to_snake_case(s):
+    # Convert to lowercase
+    s = s.lower()
+    # Replace spaces with underscores
+    s = s.replace(" ", "_")
+    return s
+
 
 #####color api########
 def get_color_name(rgb):
     url = f"https://www.thecolorapi.com/id?rgb=rgb({rgb[0]},{rgb[1]},{rgb[2]})"
     response = requests.get(url)
     data = response.json()
-    print(f"get_color_name::name::{data['name']['value']}")
-    return data['name']['value']
+    color_name = data['name']['value']
+    return convert_to_snake_case(color_name)
 
 
 ####### copied form onshape_to_robot.py #############
@@ -327,7 +334,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
     graph_state.assets.add_mesh(justPart+".stl")
 
     rgba = get_color(part)
-    print(f"dict_to_tree::rgba::type::{type(rgba)}")
+    # print(f"dict_to_tree::rgba::type::{type(rgba)}")
     c_name = get_color_name(rgba)
 
     # print(f"dict_to_tree::color::{color}")

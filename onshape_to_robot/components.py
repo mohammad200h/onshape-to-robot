@@ -143,12 +143,11 @@ class Tree:
         # namded defaults
         named_defaults=""
         for n_default in self.named_defaults:
-            # print(f"default_xml::n_default::{n_default}")
+            # print(f"default_xml::n_default::element_type::{n_default.element_type}")
             if n_default.element_type =="joint":
                     xml = f"<joint class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
                     named_defaults +=xml
             elif n_default.element_type =="geom":
-                for elem in n_default.elements:
                     xml = f"<geom class='{n_default.name}' {self.named_defaults_attributes_str(n_default.attrbutes)} />\n"
                     named_defaults +=xml
 
@@ -184,7 +183,6 @@ class Mesh:
 
 @dataclass
 class Material:
-    # 'm' stands for material this is to not cofilict with keyword class
     name:str
     rgba: List[float]
 
@@ -194,19 +192,19 @@ class Assets:
     meshes:List[Mesh] = field(default_factory=list)
 
     def add_mesh(self,m):
-        self.meshes.append(m)
+        if  m not in self.meshes:
+            self.meshes.append(m)
 
     def add_material(self,name,rgba):
         m = Material(name,rgba)
-        self.materials.append(m)
+        if m not in self.materials:
+            self.materials.append(m)
 
     def xml(self):
-        # TODO : add material
         meshes = ""
         material= ""
         for m in self.meshes:
             meshes += f" <mesh file='{m}'/>"
-        print(f"Assets::xml::materials::{self.materials}")
         for m in self.materials:
             material += f" <material name='{m.name}' rgba='{to_str(m.rgba)}'/>"
 
@@ -216,7 +214,6 @@ class Assets:
                 f"{material}"
             "</asset>"
         )
-        # print(f"Assets::xml::meshes::{self.meshes}")
         return asset
 
 @dataclass
@@ -306,7 +303,6 @@ class Geom:
             self.mesh = value
         elif attrib == "class":
             self.g_class = value
-
 
 @dataclass
 class Inertia:
