@@ -187,7 +187,6 @@ def extractPartName(name, configuration):
         parts += ['_' + configuration.replace('=', '_').replace(' ', '_')]
     return basePartName, '_'.join(parts).lower()
 
-
 def get_color(part):
     # Obtain metadatas about part to retrieve color
     if config['color'] is not None:
@@ -373,6 +372,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
     # print(f"dof_name in tree.keys()::{'dof_name' in tree.keys()}")
     # print(f"dict_to_tree::uuid4()::{uuid4()}")
     if 'dof_name' in tree.keys():
+        # print(f"dict_to_tree::{tree['z_axis']}")
         joint = Joint(
             name = tree["dof_name"],
             j_type=translate_joint_type_to_mjcf(tree["jointType"]),

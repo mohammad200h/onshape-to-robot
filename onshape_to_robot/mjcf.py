@@ -22,9 +22,9 @@ from .components import (MujocoGraphState,
 
 def create_mjcf(tree:dict)->str:
     # print(f"tree.keys()::{tree.keys()}")
-    # print("######## tree ###########")
-    # print(f"tree::{tree}")
-    # print("######## End::tree ###########")
+    print("######## tree ###########")
+    print(f"tree::{tree}")
+    print("######## End::tree ###########")
 
     mj_state = MujocoGraphState()
     root_body = dict_to_tree(tree,mj_state)
@@ -105,9 +105,9 @@ def create_mjcf(tree:dict)->str:
     # print(pretty_xml_as_string)
 
 
-    file_path = 'iiwa14/model.xml'
+    # file_path = 'iiwa14/model.xml'
 
-    with open(file_path, 'w') as file:
-        file.write(pretty_xml_as_string)
+    # with open(file_path, 'w') as file:
+    #     file.write(pretty_xml_as_string)
 
 
