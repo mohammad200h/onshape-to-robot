@@ -17,6 +17,7 @@ from .components import (MujocoGraphState,
                         Default,
                         Tree
                         )
+import numpy as np
 
 
 
@@ -27,7 +28,9 @@ def create_mjcf(tree:dict)->str:
     print("######## End::tree ###########")
 
     mj_state = MujocoGraphState()
-    root_body = dict_to_tree(tree,mj_state)
+    matrix = np.matrix(np.identity(4))
+    b_pose = [0]*6
+    root_body = dict_to_tree(tree,mj_state,matrix,b_pose)
 
     j_attribiutes_common_in_all_elements,j_classes = refactor_joint(root_body,mj_state)
     g_attribiutes_common_in_all_elements,g_classes = refactor_geom(root_body,mj_state)
@@ -105,9 +108,9 @@ def create_mjcf(tree:dict)->str:
     # print(pretty_xml_as_string)
 
 
-    # file_path = 'iiwa14/model.xml'
+    file_path = 'iiwa14/model.xml'
 
-    # with open(file_path, 'w') as file:
-    #     file.write(pretty_xml_as_string)
+    with open(file_path, 'w') as file:
+        file.write(pretty_xml_as_string)
 
 

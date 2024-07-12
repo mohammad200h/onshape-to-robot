@@ -54,6 +54,7 @@ def main():
 
 
     def addPart(occurrence, matrix):
+        print("addPart::called")
         part = occurrence['instance']
 
         if part['suppressed']:
@@ -159,6 +160,7 @@ def main():
         if robot.relative:
             pose = np.linalg.inv(matrix)*pose
 
+
         robot.addPart(pose, stlFile, mass, com, inertia, color, shapes, prefix)
 
 
@@ -224,6 +226,7 @@ def main():
 
                 if robot.relative:
                     frame = np.linalg.inv(matrix)*frame
+                    print(f"robot.relative::frame::{frame}")
                 robot.addFrame(name, frame)
 
         # Following the children in the tree, calling this function recursively
@@ -237,6 +240,8 @@ def main():
             if robot.relative:
                 axisFrame = np.linalg.inv(matrix)*worldAxisFrame
                 childMatrix = worldAxisFrame
+                print(f"robot.relative::axisFrame::{axisFrame}")
+                print(f"robot.relative::childMatrix::{childMatrix}")
             else:
                 # In SDF format, everything is expressed in the world frame, in this case
                 # childMatrix will be always identity

@@ -353,8 +353,11 @@ class BodyElements:
 
 
 class Body(Node):
-    def __init__(self,prop:BodyElements):
+    def __init__(self,prop:BodyElements,name:str = None,position:List[float]=None,euler:List[float]=None):
         super().__init__(prop)
+        self.name = name
+        self.position = position
+        self.euler = euler
 
     def xml(self):
         xml = ""
@@ -368,7 +371,11 @@ class Body(Node):
             children += child.xml()
 
         # putting it all together
-        xml += "<body>"
+        body_name = f"name='{self.name}'" if self.name else ""
+        body_pose = f"pos='{to_str(self.position)}'" if self.position else ""
+        body_euler = f"euler='{to_str(self.euler)}'" if self.euler else ""
+
+        xml += f"<body {body_name} {body_pose} {body_euler}>"
         xml += joint_xml
         # xml += intertia_xml
         xml += geom_xml

@@ -177,6 +177,46 @@ def rotationMatrixToEulerAngles(R):
     return np.array([x, y, z])
 ######## END::copied form robot_description.py ##########
 
+def rotationMatrixToQuatAngles(R):
+    """
+    Converts a rotation matrix to a quaternion.
+
+    Parameters:
+        R (numpy.ndarray): A 3x3 rotation matrix.
+
+    Returns:
+        numpy.ndarray: A 1x4 array containing the quaternion [w, x, y, z].
+    """
+    q = np.empty(4)
+    trace = np.trace(R)
+
+    if trace > 0:
+        S = 2.0 * np.sqrt(trace + 1.0)
+        q[0] = 0.25 * S
+        q[1] = (R[2, 1] - R[1, 2]) / S
+        q[2] = (R[0, 2] - R[2, 0]) / S
+        q[3] = (R[1, 0] - R[0, 1]) / S
+    elif (R[0, 0] > R[1, 1]) and (R[0, 0] > R[2, 2]):
+        S = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+        q[0] = (R[2, 1] - R[1, 2]) / S
+        q[1] = 0.25 * S
+        q[2] = (R[0, 1] + R[1, 0]) / S
+        q[3] = (R[0, 2] + R[2, 0]) / S
+    elif R[1, 1] > R[2, 2]:
+        S = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+        q[0] = (R[0, 2] - R[2, 0]) / S
+        q[1] = (R[0, 1] + R[1, 0]) / S
+        q[2] = 0.25 * S
+        q[3] = (R[1, 2] + R[2, 1]) / S
+    else:
+        S = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+        q[0] = (R[1, 0] - R[0, 1]) / S
+        q[1] = (R[0, 2] + R[2, 0]) / S
+        q[2] = (R[1, 2] + R[2, 1]) / S
+        q[3] = 0.25 * S
+
+    return q
+
 ######## copied form onshape_to_robot.py ##########
 def extractPartName(name, configuration):
     parts = name.split(' ')
@@ -212,11 +252,16 @@ def pos_form_trasform(transform):
     y = transform[1, 3]
     z = transform[2, 3]
 
+    print(f"pos_form_trasform::transform::shape::{transform.shape}")
+
     return [x,y,z]
 
 def transform_to_pos_and_euler(transform):
     rpy = rotationMatrixToEulerAngles(transform)
     xyz = pos_form_trasform(transform)
+    quat = rotationMatrixToQuatAngles(transform)
+
+    print(f"quat::{quat}")
 
     return xyz,rpy
 
@@ -320,13 +365,15 @@ def get_body(tree)->(dict,dict):
 
     return body_dic,children
 
-def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
+def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_pose) -> Body:
     """Converts a dictionary representation of a tree into a Node structure."""
     # getting general info
     id = tree['id']
     occurrence = getOccurrence([id])
-    transform =occurrence["transform"]
-    xyz,rpy = transform_to_pos_and_euler(transform)
+    pose =occurrence["transform"]
+    pose = np.linalg.inv(matrix)*pose
+    xyz,rpy = transform_to_pos_and_euler(pose)
+
 
     # getting info useful for geom
     instance = occurrence['instance']
@@ -348,7 +395,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
 
     geom = Geom(
         id = uuid4(),
-        name = "justPart",
+        name = justPart,
         pos = tuple(xyz),
         euler = tuple(rpy),
         mesh = justPart,
@@ -384,9 +431,17 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState) -> Body:
         graph_state.joint_state.add(joint.to_dict(),joint)
     body_elem = BodyElements(inertia,geom,joint)
 
-    node = Body(prop=body_elem)
+    node = Body(prop=body_elem,name=justPart,position=tuple(body_pose[:3]),euler=tuple(body_pose[3:]))
 
     for child in tree.get('children', []):
-        child_node = dict_to_tree(child,graph_state)
+        ###############
+        worldAxisFrame = child['axis_frame']
+        axisFrame = np.linalg.inv(matrix)*worldAxisFrame
+        childMatrix = worldAxisFrame
+        ###############
+        xyz,rpy = transform_to_pos_and_euler(axisFrame)
+        print(f"the thing::xyz::{xyz}")
+        print(f"the thing::rpy::{rpy}")
+        child_node = dict_to_tree(child,graph_state,childMatrix, list(xyz)+list(rpy) )
         node.add_child(child_node)
     return node
