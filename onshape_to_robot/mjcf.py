@@ -23,9 +23,9 @@ import numpy as np
 
 def create_mjcf(tree:dict)->str:
     # print(f"tree.keys()::{tree.keys()}")
-    print("######## tree ###########")
-    print(f"tree::{tree}")
-    print("######## End::tree ###########")
+    # print("######## tree ###########")
+    # print(f"tree::{tree}")
+    # print("######## End::tree ###########")
 
     mj_state = MujocoGraphState()
     matrix = np.matrix(np.identity(4))

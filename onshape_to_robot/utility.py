@@ -177,45 +177,41 @@ def rotationMatrixToEulerAngles(R):
     return np.array([x, y, z])
 ######## END::copied form robot_description.py ##########
 
-def rotationMatrixToQuatAngles(R):
-    """
-    Converts a rotation matrix to a quaternion.
+def rotationMatrixToQuatAngles(transform):
+     # Extract rotation matrix
+    R = transform[:3, :3]
 
-    Parameters:
-        R (numpy.ndarray): A 3x3 rotation matrix.
-
-    Returns:
-        numpy.ndarray: A 1x4 array containing the quaternion [w, x, y, z].
-    """
-    q = np.empty(4)
+    # Compute the trace of the rotation matrix
     trace = np.trace(R)
 
     if trace > 0:
-        S = 2.0 * np.sqrt(trace + 1.0)
-        q[0] = 0.25 * S
-        q[1] = (R[2, 1] - R[1, 2]) / S
-        q[2] = (R[0, 2] - R[2, 0]) / S
-        q[3] = (R[1, 0] - R[0, 1]) / S
+        S = np.sqrt(trace + 1.0) * 2  # S=4*q_w
+        q_w = 0.25 * S
+        q_x = (R[2, 1] - R[1, 2]) / S
+        q_y = (R[0, 2] - R[2, 0]) / S
+        q_z = (R[1, 0] - R[0, 1]) / S
     elif (R[0, 0] > R[1, 1]) and (R[0, 0] > R[2, 2]):
-        S = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
-        q[0] = (R[2, 1] - R[1, 2]) / S
-        q[1] = 0.25 * S
-        q[2] = (R[0, 1] + R[1, 0]) / S
-        q[3] = (R[0, 2] + R[2, 0]) / S
+        S = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2  # S=4*q_x
+        q_w = (R[2, 1] - R[1, 2]) / S
+        q_x = 0.25 * S
+        q_y = (R[0, 1] + R[1, 0]) / S
+        q_z = (R[0, 2] + R[2, 0]) / S
     elif R[1, 1] > R[2, 2]:
-        S = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
-        q[0] = (R[0, 2] - R[2, 0]) / S
-        q[1] = (R[0, 1] + R[1, 0]) / S
-        q[2] = 0.25 * S
-        q[3] = (R[1, 2] + R[2, 1]) / S
+        S = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2  # S=4*q_y
+        q_w = (R[0, 2] - R[2, 0]) / S
+        q_x = (R[0, 1] + R[1, 0]) / S
+        q_y = 0.25 * S
+        q_z = (R[1, 2] + R[2, 1]) / S
     else:
-        S = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
-        q[0] = (R[1, 0] - R[0, 1]) / S
-        q[1] = (R[0, 2] + R[2, 0]) / S
-        q[2] = (R[1, 2] + R[2, 1]) / S
-        q[3] = 0.25 * S
+        S = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2  # S=4*q_z
+        q_w = (R[1, 0] - R[0, 1]) / S
+        q_x = (R[0, 2] + R[2, 0]) / S
+        q_y = (R[1, 2] + R[2, 1]) / S
+        q_z = 0.25 * S
 
-    return q
+    quaternion = np.array([q_w, q_x, q_y, q_z])
+
+    return quaternion
 
 ######## copied form onshape_to_robot.py ##########
 def extractPartName(name, configuration):
@@ -232,6 +228,8 @@ def get_color(part):
     if config['color'] is not None:
         color = config['color']
     else:
+        print(f"get_color::part::keys::{part.keys()}")
+        print(f"get_color::part::{part}")
         metadata = client.part_get_metadata(
             part['documentId'], part['documentMicroversion'], part['elementId'], part['partId'], part['configuration'])
         color = [0.5, 0.5, 0.5]
@@ -252,7 +250,7 @@ def pos_form_trasform(transform):
     y = transform[1, 3]
     z = transform[2, 3]
 
-    print(f"pos_form_trasform::transform::shape::{transform.shape}")
+    # print(f"pos_form_trasform::transform::shape::{transform.shape}")
 
     return [x,y,z]
 
@@ -260,10 +258,8 @@ def transform_to_pos_and_euler(transform):
     rpy = rotationMatrixToEulerAngles(transform)
     xyz = pos_form_trasform(transform)
     quat = rotationMatrixToQuatAngles(transform)
-
-    print(f"quat::{quat}")
-
-    return xyz,rpy
+    # print(f"quat::{quat}")
+    return xyz,rpy,quat
 
 def getMeshName(occurrence):
     part = occurrence['instance']
@@ -337,7 +333,7 @@ def get_body(tree)->(dict,dict):
     id = tree["id"]
     occurrence = getOccurrence([id])
     transform =occurrence["transform"]
-    xyz,rpy = transform_to_pos_and_euler(transform)
+    xyz,rpy,quat = transform_to_pos_and_euler(transform)
     instance = occurrence['instance']
     link_name = processPartName(
     instance['name'], instance['configuration'], occurrence['linkName'])
@@ -372,7 +368,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_p
     occurrence = getOccurrence([id])
     pose =occurrence["transform"]
     pose = np.linalg.inv(matrix)*pose
-    xyz,rpy = transform_to_pos_and_euler(pose)
+    xyz,rpy,quat = transform_to_pos_and_euler(pose)
 
 
     # getting info useful for geom
@@ -387,7 +383,7 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_p
     # print(f"dict_to_tree::rgba::type::{type(rgba)}")
 
     c_name = get_color_name(rgba)
-    print(f"c_name::{c_name}")
+    # print(f"c_name::{c_name}")
     # print(f"dict_to_tree::color::{color}")
     graph_state.assets.add_material(c_name,rgba)
 
@@ -439,9 +435,9 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_p
         axisFrame = np.linalg.inv(matrix)*worldAxisFrame
         childMatrix = worldAxisFrame
         ###############
-        xyz,rpy = transform_to_pos_and_euler(axisFrame)
-        print(f"the thing::xyz::{xyz}")
-        print(f"the thing::rpy::{rpy}")
+        xyz,rpy,quat = transform_to_pos_and_euler(axisFrame)
+        # print(f"the thing::xyz::{xyz}")
+        # print(f"the thing::rpy::{rpy}")
         child_node = dict_to_tree(child,graph_state,childMatrix, list(xyz)+list(rpy) )
         node.add_child(child_node)
     return node

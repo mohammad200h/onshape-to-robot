@@ -119,7 +119,7 @@ class Tree:
 
         mj_xml = (
             "<mujoco model='robot'>"
-            "<compiler angle='radian' autolimits='true'/>"
+            "<compiler angle='radian' autolimits='true' eulerseq='XYZ'/>"
 	        "<option integrator='implicitfast'/>"
             f"{asset_xml}"
             f"{default_xml}"
@@ -280,15 +280,23 @@ class Geom:
     g_type: str = "mesh"
     pos: List[float] = None
     euler: List[float] = None
+    quat: List[float] = None
     g_class: str = None
     id:UUID = uuid4()
 
     def xml(self):
         class_xml = f"class='{self.g_class}'" if self.g_class else ""
         material_xml = f"material='{self.material.name}'" if self.material else ""
-        print(f"Geom::xml::self.g_class::{self.g_class}")
+        # print(f"Geom::xml::self.g_class::{self.g_class}")
 
-        return f"<geom {class_xml} type='mesh' pos='{to_str(self.pos)}' euler='{to_str(self.euler)}' mesh='{self.mesh}' {material_xml} />"
+        angle_xml = ""
+        if self.euler:
+            angle_xml = f"euler='{to_str(self.euler)}'"
+        if self.quat:
+            angle_xml = f"quat='{to_str(self.quat)}'"
+
+
+        return f"<geom {class_xml} type='mesh' pos='{to_str(self.pos)}' {angle_xml} mesh='{self.mesh}' {material_xml} />"
 
     def to_dict(self):
         return {
@@ -310,19 +318,21 @@ class Geom:
         elif attrib == "type":
             self.g_type = value
         elif attrib == "material":
-            print(f"Geom::set_attrib::material::value::{value}")
+            # print(f"Geom::set_attrib::material::value::{value}")
             self.material = value
         elif attrib == "pos":
             self.pos = value
         elif attrib == "euler":
             self.euler = value
+        elif attrib == "quat":
+            self.quat = value
         elif attrib == "mesh":
             self.mesh = value
         elif attrib == "class":
-            print(f"Geom::set_attrib::class::value::{value}")
+            # print(f"Geom::set_attrib::class::value::{value}")
             self.g_class = value
-            print(f"Geom::set_attrib::class::self.g_class::{self.g_class}")
-            print(f"Geom::set_attrib::class::self.id::{self.id}")
+            # print(f"Geom::set_attrib::class::self.g_class::{self.g_class}")
+            # print(f"Geom::set_attrib::class::self.id::{self.id}")
 
 @dataclass
 class Inertia:
@@ -343,7 +353,6 @@ class Site:
     name:str
     group:str
 
-
 @dataclass
 class BodyElements:
     inertia:Inertia
@@ -353,11 +362,12 @@ class BodyElements:
 
 
 class Body(Node):
-    def __init__(self,prop:BodyElements,name:str = None,position:List[float]=None,euler:List[float]=None):
+    def __init__(self,prop:BodyElements,name:str = None,position:List[float]=None,euler:List[float]=None,quat:List[float]=None):
         super().__init__(prop)
         self.name = name
         self.position = position
         self.euler = euler
+        self.quat = quat
 
     def xml(self):
         xml = ""
@@ -373,9 +383,20 @@ class Body(Node):
         # putting it all together
         body_name = f"name='{self.name}'" if self.name else ""
         body_pose = f"pos='{to_str(self.position)}'" if self.position else ""
-        body_euler = f"euler='{to_str(self.euler)}'" if self.euler else ""
 
-        xml += f"<body {body_name} {body_pose} {body_euler}>"
+        body_angle = ""
+
+        print(f"Body::xml::name::{self.name}::quat::{self.quat}")
+
+
+        if self.euler:
+            body_angle = f"euler='{to_str(self.euler)}'"
+        if self.quat:
+            body_angle = f"quat='{to_str(self.quat)}'"
+
+
+
+        xml += f"<body {body_name} {body_pose} {body_angle}>"
         xml += joint_xml
         # xml += intertia_xml
         xml += geom_xml
@@ -434,12 +455,9 @@ class GeneralActuator:
     # 'a' stands for material this is to not cofilict with keyword class
     a_class:str
 
-
-
 @dataclass
 class Actuator:
     general_acts:List[GeneralActuator]
-
 
 @dataclass
 class ElementState:
