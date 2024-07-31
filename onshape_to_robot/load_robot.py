@@ -12,6 +12,8 @@ workspaceId = None
 client = Client(logging=False, creds=configFile)
 client.useCollisionsConfigurations = config["useCollisionsConfigurations"]
 
+assembly = None
+
 # If a versionId is provided, it will be used, else the main workspace is retrieved
 if config["versionId"] != "":
     print(
@@ -101,7 +103,61 @@ else:
         configuration=config["configuration"],
     )
 
+# print(f"assembly::keys::{assembly.keys()}\n\n")
+# print(f"assembly::rootAssembly::keys::{assembly['rootAssembly'].keys()}\n\n")
+
+# print(f"assembly::subAssemblies::len::{len(assembly['subAssemblies'])}\n\n")
+# print(f"assembly::subAssemblies::[0]::keys::{assembly['subAssemblies'][0].keys()}\n\n")
+
+
+# print(f"assembly::rootAssembly::{assembly['rootAssembly']}\n\n")
+
+# print(f"assembly::subAssemblies::[0]::{assembly['subAssemblies'][0]}\n\n")
+
+# for instance in assembly['subAssemblies'][0]["instances"]:
+#     print(f"instance::{instance}\n")
+
+# for feature in assembly['subAssemblies'][0]["features"]:
+#     print(f"feature::{feature}\n")
+
+
+
+# for sub in assembly['subAssemblies']:
+#     print(f"sub::documentId::{sub['documentId']}")
+
+
+
 root = assembly["rootAssembly"]
+
+# print(f"load_robot::root::keys::{root.keys()}\n")
+# print(f"load_robot::root::occurrences::{root['occurrences']}")
+
+# for occurrenc in  root['occurrences']:
+    # print(f"occurrenc::{occurrenc}\n")
+
+# for instance in root['instances']:
+    # print(f"instance::{instance}\n")
+
+# for pattern in root['patterns']:
+    # print(f"pattern::{pattern}\n")
+
+# for feature in root['features']:
+    # print(f"feature::{feature}\n")
+
+# print(f"fullConfiguration::{root['fullConfiguration']}\n")
+
+# print(f"configuration::{root['configuration']}\n")
+
+# print(f"documentId::{root['documentId']}\n")
+
+# print(f"elementId::{root['elementId']}\n")
+
+# print(f"documentMicroversion::{root['documentMicroversion']}\n")
+
+
+
+
+
 
 # Finds a (leaf) instance given the full path, typically A B C where A and B would be subassemblies and C
 # the final part

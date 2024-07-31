@@ -6,7 +6,8 @@ from .utility import (transform_to_pos_and_euler,
                         getMeshName,
                         get_inetia_prop,
                         get_body,
-                        dict_to_tree
+                        dict_to_tree,
+                        dic_to_assembly
                         )
 
 import xml.dom.minidom
@@ -17,19 +18,23 @@ from .components import (MujocoGraphState,
                         Default,
                         Tree
                         )
+
+from .onshape_mjcf import Entity,EntityType,Assembly,Part
 import numpy as np
 
 
 
 def create_mjcf(tree:dict)->str:
-    # print(f"tree.keys()::{tree.keys()}")
-    # print("######## tree ###########")
-    # print(f"tree::{tree}")
-    # print("######## End::tree ###########")
 
+    # sotres defaults and assents
     mj_state = MujocoGraphState()
+
+    #Transfrom: Rotation and translation matrix
     matrix = np.matrix(np.identity(4))
+    # base pose
     b_pose = [0]*6
+
+    # create a tree and returns root node (root body)
     root_body = dict_to_tree(tree,mj_state,matrix,b_pose)
 
     j_attribiutes_common_in_all_elements,j_classes = refactor_joint(root_body,mj_state)
@@ -95,7 +100,6 @@ def create_mjcf(tree:dict)->str:
     # assining classes and cleaning up tree
     tree.refactor()
 
-    # print(f"tree::{tree.xml()}")
 
     # Parse the XML string
     dom = xml.dom.minidom.parseString(tree.xml())
@@ -114,3 +118,21 @@ def create_mjcf(tree:dict)->str:
         file.write(pretty_xml_as_string)
 
 
+def create_mjcf_complex(assembly:dict):
+
+    root = assembly["rootAssembly"]
+    root_subassembly = assembly["subAssemblies"]
+
+    root_instances = root["instances"]
+    root_features = root["features"]
+
+    root_assemby = Assembly(
+        e_id = None,
+        e_type = EntityType.Assembly,
+        name = None,
+        element_id = root["elementId"],
+        document_id = root["documentId"]
+    )
+    dic_to_assembly(root,root_subassembly,root_assemby)
+
+    print(f"root_assemby::{root_assemby}")

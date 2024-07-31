@@ -3,6 +3,7 @@ from dataclasses import dataclass,field
 from uuid import uuid4,UUID
 
 from enum import Enum
+import numpy as np
 
 def all_ids_match(list1, list2):
     s1 = set([str(id) for id in list1])
@@ -337,14 +338,19 @@ class Geom:
 @dataclass
 class Inertia:
     pos:List[float]
-    euler:Optional[List[float]]
     mass:float
     fullinertia:List[float]
 
 
     def xml(self):
-        return f"<inertial pos='{to_str(self.pos)}' mass='{self.mass}' euler='{to_str(self.euler)}' fullinertia='{to_str(self.fullinertia)}' />"
+        return f"<inertial pos='{to_str(self.pos)}' mass='{self.mass}'  fullinertia='{self.fullinertia_str()}' />"
 
+    def fullinertia_str(self):
+        print(f"Inertia::fullinertia_str::self.fullinertia::{self.fullinertia}")
+        i_mat = np.array(self.fullinertia).reshape((3,3))
+        i_str = f"{i_mat[0,0]} {i_mat[1,1]} {i_mat[2,2]} {i_mat[0,1]} {i_mat[0,2]} {i_mat[1,2]}"
+
+        return i_str
 @dataclass
 class Site:
     size:List[float]
@@ -375,7 +381,7 @@ class Body(Node):
         joint_xml = self.prop.joint.xml() if self.prop.joint !=None else ""
         geom_xml =  self.prop.geom.xml()
         #TODO: figure out what is wrong with inertia
-        # intertia_xml = self.prop.inertia.xml()
+        intertia_xml = self.prop.inertia.xml()
         children = ""
         for child in self.children:
             children += child.xml()
@@ -398,7 +404,7 @@ class Body(Node):
 
         xml += f"<body {body_name} {body_pose} {body_angle}>"
         xml += joint_xml
-        # xml += intertia_xml
+        xml += intertia_xml
         xml += geom_xml
         xml += children
         xml += "</body>"

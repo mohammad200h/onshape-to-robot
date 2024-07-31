@@ -7,6 +7,13 @@ import math
 import numpy as np
 from .load_robot import \
      config, client, tree, occurrences, getOccurrence, frames
+
+
+from .onshape_mjcf import ( Entity,
+                            EntityType,
+                            Assembly,
+                            Part)
+
 from uuid import uuid4,UUID
 
 import requests
@@ -21,7 +28,6 @@ def convert_to_snake_case(s):
     s = s.lower()
     s = s.replace(" ", "_")
     return s
-
 
 #####color api########
 def get_color_name(rgb):
@@ -228,8 +234,8 @@ def get_color(part):
     if config['color'] is not None:
         color = config['color']
     else:
-        print(f"get_color::part::keys::{part.keys()}")
-        print(f"get_color::part::{part}")
+        # print(f"get_color::part::keys::{part.keys()}")
+        # print(f"get_color::part::{part}")
         metadata = client.part_get_metadata(
             part['documentId'], part['documentMicroversion'], part['elementId'], part['partId'], part['configuration'])
         color = [0.5, 0.5, 0.5]
@@ -303,7 +309,23 @@ def get_inetia_prop(prefix,part):
 
 
 
-    return mass,inertia
+    return mass,inertia,com
+
+def compute_inertia(matrix,com,inertia):
+    # this is taken from addLinkDynamics
+     # Inertia
+        I = np.matrix(np.reshape(inertia[:9], (3, 3)))
+        R = matrix[:3, :3]
+        # Expressing COM in the link frame
+        com = np.array(
+            (matrix*np.matrix([com[0], com[1], com[2], 1]).T).T)[0][:3]
+        # Expressing inertia in the link frame
+        inertia = R*I*R.T
+
+        return {
+            'com': com,
+            'inertia': inertia
+        }
 
 def get_body(tree)->(dict,dict):
     """
@@ -403,12 +425,12 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_p
     graph_state.geom_state.add(geom.to_dict(),geom)
 
     # getting inertia
-    mass,i_matrix = get_inetia_prop(prefix,part)
+    mass,intertia_props,com = get_inetia_prop(prefix,part)
+    i_prop_dic = compute_inertia(matrix,com,intertia_props)
     inertia = Inertia(
-        pos= xyz,
-        euler=rpy,
+        pos= i_prop_dic["com"],
         mass = mass,
-        fullinertia=i_matrix
+        fullinertia=i_prop_dic["inertia"]
     )
     # getting joint if any
     joint= None
@@ -441,3 +463,40 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_p
         child_node = dict_to_tree(child,graph_state,childMatrix, list(xyz)+list(rpy) )
         node.add_child(child_node)
     return node
+
+def dic_to_assembly(assembly_dic:dict,sub_assemblies:dict,root_assemby:Assembly):
+
+    root_instances = assembly_dic["instances"]
+    root_features  = assembly_dic["features"]
+
+    for instance in root_instances:
+        if instance["type"]=="Part":
+            part = Part(
+                e_id = instance["id"],
+                e_type = instance["type"],
+                name =  instance["name"],
+                element_id = instance["elementId"],
+                document_id = instance["documentId"],
+                documentMicroversion = instance["documentMicroversion"],
+                configuration =  instance["configuration"]
+            )
+            root_assemby.parts.append(part)
+        elif instance["type"]=="Assembly":
+            assembly =  Assembly(
+                e_id = instance["id"],
+                e_type =  instance["type"],
+                name = instance["name"],
+                element_id = instance["elementId"],
+                document_id = instance["documentId"]
+            )
+            for sub in sub_assemblies:
+                # print(f"sub::{sub}")
+                # print(f"sub::documentId::{sub['documentId']}")
+                # print(f"sub::instance::{instance['id']}")
+                if sub["elementId"] == instance["elementId"]:
+                    sub_assemblies = assembly_dic["subAssemblies"] if "subAssemblies" in assembly_dic.keys() else []
+                    dic_to_assembly(sub,sub_assemblies,assembly)
+                    break
+            root_assemby.assemblies.append(assembly)
+
+
