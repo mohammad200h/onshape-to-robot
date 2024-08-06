@@ -12,9 +12,14 @@ from .load_robot import \
 from .onshape_mjcf import ( Entity,
                             EntityType,
                             Assembly,
-                            Part)
+                            Part,
+                            OnshapeState,
+                            EntityNode
+                            )
 
 from uuid import uuid4,UUID
+
+from colorama import Fore, Back, Style
 
 import requests
 
@@ -464,39 +469,191 @@ def dict_to_tree(tree: Dict[str, Any],graph_state:MujocoGraphState,matrix,body_p
         node.add_child(child_node)
     return node
 
-def dic_to_assembly(assembly_dic:dict,sub_assemblies:dict,root_assemby:Assembly):
+def find_occerance_key(occurrences,instance_id):
+    for key in occurrences.keys():
+        if instance_id in key:
+            return key
+    reutrn ()
+
+def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
+                    sub_assemblies:dict,root_assemby:Assembly):
 
     root_instances = assembly_dic["instances"]
     root_features  = assembly_dic["features"]
+    root_assemby.features = root_features
 
     for instance in root_instances:
         if instance["type"]=="Part":
+
+            key = find_occerance_key(occurrences,instance["id"])
+            occerance = occurrences[key]
+            justPart,prefix,part = getMeshName(occerance)
+            color = get_color(part)
+            mass,inertia,com = get_inetia_prop(prefix,part)
+
             part = Part(
                 e_id = instance["id"],
-                e_type = instance["type"],
+                e_type = EntityType.PART,
                 name =  instance["name"],
                 element_id = instance["elementId"],
                 document_id = instance["documentId"],
                 documentMicroversion = instance["documentMicroversion"],
-                configuration =  instance["configuration"]
+                configuration =  instance["configuration"],
+                occerance = occerance,
+                instance = instance,
+                mesh_info = {"justPart":justPart,"prefix":prefix,"part":part},
+                inertia_info = {"mass":mass,"inertia":inertia,"com":com},
+                color = color,
+                transform = occerance["transform"],
+
             )
-            root_assemby.parts.append(part)
+            state.add_part(part)
+            root_assemby.add_part(part)
         elif instance["type"]=="Assembly":
+            occerance = occurrences[key]
+            # print("type::assembly")
+            # print(f"dic_to_assembly::instance::name::{instance['name']}")
+            # print(f"dic_to_assembly::occurrences::{occurrences.keys()}")
+            # print(f"dic_to_assembly::instance::id::{instance['id']}")
+            # print(f"dic_to_assembly::occerance::transform::{occerance['transform']}")
+
             assembly =  Assembly(
                 e_id = instance["id"],
-                e_type =  instance["type"],
+                e_type =  EntityType.Assembly,
                 name = instance["name"],
                 element_id = instance["elementId"],
-                document_id = instance["documentId"]
+                document_id = instance["documentId"],
+                occerance = occerance,
+                instance = instance,
+                features = None
             )
+            state.add_assembly(assembly)
             for sub in sub_assemblies:
                 # print(f"sub::{sub}")
                 # print(f"sub::documentId::{sub['documentId']}")
                 # print(f"sub::instance::{instance['id']}")
                 if sub["elementId"] == instance["elementId"]:
                     sub_assemblies = assembly_dic["subAssemblies"] if "subAssemblies" in assembly_dic.keys() else []
-                    dic_to_assembly(sub,sub_assemblies,assembly)
+                    dic_to_assembly(state,sub,occurrences,sub_assemblies,assembly)
                     break
-            root_assemby.assemblies.append(assembly)
+            root_assemby.add_assembly(assembly)
+
+
+def set_parnt_child_relation_for_assembly(assembly:Assembly,onshape_state:OnshapeState):
+    relations = []
+    counter = 0
+    for feature in assembly.features:
+        if feature['featureType']=='mate':
+            if feature['featureData']['mateType'] == 'REVOLUTE':
+                feature_id = feature['id']
+                mated_entities = feature['featureData']['matedEntities']
+                counter +=1
+                relation = {
+                    "child":{
+                        "part":None,
+                        "assembly":None
+                    },
+                    "parent":{
+                        "part":None,
+                        "assembly":None
+                    }
+                }
+
+                # first element is child
+                # first mate should be made on child link
+                # this is an assumption that is made and
+                # explained in onshape Doc
+                child = mated_entities[0]['matedOccurrence']
+
+                # second element is parnt
+                parent = mated_entities[1]['matedOccurrence']
+
+
+                # in case part is part of assembly the list
+                # will contain both part and assembly
+                # if the part is with in root assembly the
+                # list will have one element which is the part
+
+                for e_id in child:
+                    entity = onshape_state.get_entity(e_id)
+                    if entity["type"]=="part":
+                        relation["child"]["part"] = entity
+                    else:
+                        relation["child"]["assembly"] = entity
+                for e_id in parent:
+                    entity = onshape_state.get_entity(e_id)
+                    if entity["type"]=="part":
+                        relation["parent"]["part"] = entity
+                    else:
+                        relation["parent"]["assembly"] = entity
+                relations.append(relation)
+
+    print(f"set_parnt_child_relation_for_assembly::counter::{counter}")
+    assembly.relations = relations
+
+def get_base_entity(assembly_tree:Assembly):
+    for relation in assembly_tree.relations:
+        parent_name = relation["parent"]["part"]["name"]
+        if "base" in parent_name or "Base" in parent_name:
+            return relation["parent"]['part']['entity']
+
+    return None
+
+def find_relation(relations:List,parent:Entity):
+    children = []
+    # print(f"find_relation::parent::{parent}")
+    # print(f"find_relation::relations::len::{len(relations)}")
+    for relation in relations:
+        p = relation['parent']
+        # print(f"find_relation::p::{p}")
+
+        if p['part'] and p['part']['entity'].e_id == parent.e_id:
+            children.append( relation["child"])
+        elif p['assembly'] and p['assembly']['entity'].e_id == parent.e_id:
+            children.append( relation["child"])
+    return children
+
+def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,onshape_state:OnshapeState):
+    # print(f"cunstruct_relation_tree::EntityNode::e_type::{entity_node.e_type}")
+    children = []
+    if entity_node.e_type == EntityType.Assembly:
+        parent = entity_node.entity.root_entity
+        children = find_relation(current_assembly.relations,parent)
+        # print(f"cunstruct_relation_tree::assembly::children::len::{len(children)}")
+
+
+    elif entity_node.e_type == EntityType.PART:
+        parent = entity_node.entity
+        # print(f"cunstruct_relation_tree:: entity_node.e_type == EntityType.PART::parent::{parent.name}")
+        children = find_relation(current_assembly.relations,parent)
+        # print(f"cunstruct_relation_tree::part::children::len::{len(children)}")
+
+    for child in children:
+        if child['assembly']:
+            print("child is assembly")
+            child_entitiy_node =EntityNode (
+                child['assembly']['entity'],
+                child['assembly']['entity'].e_type
+            )
+            entity_node.add_child(child_entitiy_node)
+            # print(f"child is assembly::child['part']['entity']::{child['part']['entity']}")
+            #set root of the assembly
+            child['assembly']['entity'].root_entity = child['part']['entity']
+            set_parnt_child_relation_for_assembly(child['assembly']['entity'],onshape_state)
+            cunstruct_relation_tree(child_entitiy_node,child['assembly']['entity'],onshape_state)
+            continue
+        elif child['part']:
+            print("child is part")
+            child_entitiy_node = EntityNode(
+                child['part']['entity'],
+                child['part']['entity'].e_type
+            )
+            entity_node.add_child(child_entitiy_node)
+            cunstruct_relation_tree(child_entitiy_node,current_assembly,onshape_state)
+
+
+def assembly_tree_to_models(assembly_tree:Assembly,
+                            onshape_state:OnshapeState):
+    pass
 
 

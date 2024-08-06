@@ -1,13 +1,20 @@
 
-from .load_robot import \
-        config, client, tree, occurrences, getOccurrence, frames
+from .load_robot import (
+        config, client, tree,
+        occurrences, getOccurrence,
+        frames,findInstance
+)
 
 from .utility import (transform_to_pos_and_euler,
                         getMeshName,
                         get_inetia_prop,
                         get_body,
                         dict_to_tree,
-                        dic_to_assembly
+                        dic_to_assembly,
+                        set_parnt_child_relation_for_assembly,
+                        get_base_entity,
+                        find_relation,
+                        cunstruct_relation_tree
                         )
 
 import xml.dom.minidom
@@ -19,7 +26,13 @@ from .components import (MujocoGraphState,
                         Tree
                         )
 
-from .onshape_mjcf import Entity,EntityType,Assembly,Part
+from .onshape_mjcf import (Entity,
+                           EntityType,
+                           Assembly,
+                           Part,
+                           OnshapeState,
+                           EntityNode
+                           )
 import numpy as np
 
 
@@ -118,21 +131,112 @@ def create_mjcf(tree:dict)->str:
         file.write(pretty_xml_as_string)
 
 
-def create_mjcf_complex(assembly:dict):
+def create_mjcf_assembly_tree(assembly:dict):
+
+    # print(f"config::{config}")
+
+    state = OnshapeState()
 
     root = assembly["rootAssembly"]
-    root_subassembly = assembly["subAssemblies"]
+    subassemblies = assembly["subAssemblies"]
 
     root_instances = root["instances"]
     root_features = root["features"]
 
-    root_assemby = Assembly(
-        e_id = None,
-        e_type = EntityType.Assembly,
-        name = None,
-        element_id = root["elementId"],
-        document_id = root["documentId"]
-    )
-    dic_to_assembly(root,root_subassembly,root_assemby)
+    subassembly_instances = subassemblies[0]["instances"]
+    subassembly_features = subassemblies[0]["features"]
 
-    print(f"root_assemby::{root_assemby}")
+    # print(f"root_features::{root_features}")
+
+    # for feature in root_features:
+    #     print("\n\n")
+    #     print(f"feature::{feature}")
+    # return
+
+    # print("\n\n")
+    # print(f"root::{root}")
+
+    ####### This code was  copy pasted from load_robot.py ########
+    # Collecting occurrences, the path is the assembly / sub assembly chain
+    occurrences = {}
+    for occurrence in root["occurrences"]:
+        occurrence["instance"] = findInstance(occurrence["path"])
+        occurrence["transform"] = np.matrix(np.reshape(occurrence["transform"], (4, 4)))
+
+        occurrences[tuple(occurrence["path"])] = occurrence
+    ###### END ########
+
+    root_assemby = Assembly(
+        e_id = "root",
+        e_type = EntityType.Assembly,
+        name = config["assemblyName"],
+        element_id  = root["elementId"],
+        document_id = root["documentId"],
+        occerance = None,
+        instance = None,
+        features = None
+    )
+    state.add_assembly(root_assemby)
+    dic_to_assembly(state,root,occurrences,subassemblies,root_assemby)
+
+    # for part in root_assemby.parts:
+    #     print(f"root_assemby::part::name::{part.name}")
+
+    # for part in root_assemby.assemblies[0].parts:
+        # print(f"root_assemby.assemblies[0]::part::name::{part.name}")
+
+    # print(f"state::parts::keys::{state.parts.keys()}")
+    # print(f"state::assemblies::keys::{state.assemblies.keys()}")
+
+    return root_assemby,state
+
+def create_models(assembly_tree:Assembly,onshape_state:OnshapeState):
+    print("\n")
+    # print(f"assembly_tree::part::id::{[part.e_id for part in assembly_tree.parts]}")
+    # print(f"assembly_tree::assembly::id::{[assembly.e_id for assembly in assembly_tree.assemblies]}")
+
+    # print(f"onshape_state::parts_id::{onshape_state.parts_id}")
+    # print(f"onshape_state::part_name::{[ onshape_state.get_part(id).name for id in  onshape_state.parts_id ]}")
+    # print(f"onshape_state::assemblies_id::{onshape_state.assemblies_id}")
+    # print(f"onshape_state::assembly_name::{[ onshape_state.get_assembly(id).name for id in  onshape_state.assemblies_id ]}")
+    print("\n")
+
+    # print(f"assembly_tree::features::len::{len(assembly_tree.features)}")
+
+    set_parnt_child_relation_for_assembly(assembly_tree,onshape_state)
+    base_entity = get_base_entity(assembly_tree)
+    # print(f"base_entity::{base_entity}")
+    assembly_tree.root_entity = base_entity
+
+    # print(f"assembly_tree::relations::len::{len(assembly_tree.relations)}")
+
+
+
+
+    #cunstruct relations for assemblies
+    entitiy_node = EntityNode(
+        assembly_tree,
+        assembly_tree.e_type
+    )
+
+    cunstruct_relation_tree(entitiy_node,assembly_tree,onshape_state)
+
+    # print(f"entitiy_node.children::{[ch.entity.name for ch in entitiy_node.children]}")
+    # print(f"base::link1::link2::{entitiy_node.children[1].children[0].entity.name}")
+
+    print(f"base::two_link_assembly::{entitiy_node.children[0].entity.name}")
+    print(f"base::two_link_assembly::{entitiy_node.children[0].children[0].entity.name}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
