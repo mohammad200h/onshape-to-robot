@@ -19,6 +19,7 @@ def init(client, config, root, workspaceId, assemblyId):
     # Retrieving root configuration parameters
     configuration_parameters = {}
     parts = root['fullConfiguration'].split(';')
+    # print(f"init::parts::{parts}")
     for part in parts:
         kv = part.split('=')
         if len(kv) == 2:
@@ -91,6 +92,10 @@ def readParameterValue(parameter, name):
 
 
 def getLimits(jointType, name):
+    # print(f"getLimits::jointType::{jointType}")
+    # print(f"getLimits::name::{name}")
+    # print(f"joint_features['features']::{joint_features['features']}")
+
     enabled = False
     minimum, maximum = 0, 0
     for feature in joint_features['features']:

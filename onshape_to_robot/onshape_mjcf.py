@@ -16,14 +16,29 @@ class EntityType(Enum):
     PART = "part"
     Assembly = "assembly"
 
+class JointType(Enum):
+    REVOLUTE = "revolute"
+    FASTENED = "fastened"
+    SLIDER = "slider"
+    CYLINDRICAL = "cylindrical"
+    BALL = "ball"
+
+@dataclass
+class JointData:
+    name: Optional[str] = None
+    j_type: Optional[JointType] = None
+    z_axis: Optional[Any] = None
+    mated_entity: Optional[Any] = None
+    #This is an assembly that owns the features
+    owner:'Assembly' = None
+
+
 @dataclass
 class EntityNode:
     entity:Any
     e_type:EntityType
     parent:Optional['EntityNode'] = None
     children:List['EntityNode'] = field(default_factory=list)
-
-
 
     def add_child(self, child_node:'EntityNode'):
         """Adds a child node to the current node."""
@@ -35,6 +50,8 @@ class EntityNode:
 class Entity:
     e_id:str
     e_type:EntityType
+    joint:JointData
+
 
 
 @dataclass
@@ -59,6 +76,7 @@ class Assembly(Entity):
     document_id:str
     instance:dict
     features:dict
+    fullConfiguration:str
     # dervied values
     occerance:dict
     root_entity:Entity = None
@@ -106,7 +124,6 @@ class OnshapeState:
             self.assemblies_element_assembly_id[assembly.element_id].append(assembly.e_id)
         self.assemblies_id.append(assembly.e_id)
         self.assemblies.append(assembly)
-
 
     def add_part(self,part:Part):
         if part.element_id not in self.unique_element_ids:

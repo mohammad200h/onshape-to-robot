@@ -6,7 +6,7 @@ from .components import (Body,Geom,Joint,Inertia,
 import math
 import numpy as np
 from .load_robot import \
-     config, client, tree, occurrences, getOccurrence, frames
+     config, client, tree, occurrences, getOccurrence, frames,get_T_part_mate
 
 
 from .onshape_mjcf import ( Entity,
@@ -14,8 +14,12 @@ from .onshape_mjcf import ( Entity,
                             Assembly,
                             Part,
                             OnshapeState,
-                            EntityNode
+                            EntityNode,
+                            JointType,
+                            JointData
                             )
+
+from .features import init as features_init
 
 from uuid import uuid4,UUID
 
@@ -494,6 +498,7 @@ def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
             part = Part(
                 e_id = instance["id"],
                 e_type = EntityType.PART,
+                joint = JointData(),
                 name =  instance["name"],
                 element_id = instance["elementId"],
                 document_id = instance["documentId"],
@@ -520,12 +525,15 @@ def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
             assembly =  Assembly(
                 e_id = instance["id"],
                 e_type =  EntityType.Assembly,
+                joint = JointData(),
                 name = instance["name"],
                 element_id = instance["elementId"],
                 document_id = instance["documentId"],
                 occerance = occerance,
                 instance = instance,
-                features = None
+                features = None,
+                fullConfiguration = instance["fullConfiguration"]
+
             )
             state.add_assembly(assembly)
             for sub in sub_assemblies:
@@ -538,25 +546,35 @@ def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
                     break
             root_assemby.add_assembly(assembly)
 
-
 def set_parnt_child_relation_for_assembly(assembly:Assembly,onshape_state:OnshapeState):
     relations = []
     counter = 0
+    # print(f"assembly.features::{assembly.features}")
     for feature in assembly.features:
+        # print(f"set_parnt_child_relation_for_assembly::feature::{feature}")
         if feature['featureType']=='mate':
             if feature['featureData']['mateType'] == 'REVOLUTE':
+                # print(f"feature['featureData']::{feature['featureData']}\n")
                 feature_id = feature['id']
                 mated_entities = feature['featureData']['matedEntities']
                 counter +=1
                 relation = {
                     "child":{
                         "part":None,
-                        "assembly":None
+                        "assembly":None,
+                        "joint":{
+                            "type":JointType(feature['featureData']['mateType'].lower()),
+                            "name": feature['featureData']['name'],
+                            "z_axis":mated_entities[0]['matedCS']['zAxis'],
+                            "assembly_owning_feature":assembly
+                        },
+                        "mated_entity":mated_entities[0]
                     },
                     "parent":{
                         "part":None,
                         "assembly":None
                     }
+
                 }
 
                 # first element is child
@@ -588,7 +606,7 @@ def set_parnt_child_relation_for_assembly(assembly:Assembly,onshape_state:Onshap
                         relation["parent"]["assembly"] = entity
                 relations.append(relation)
 
-    print(f"set_parnt_child_relation_for_assembly::counter::{counter}")
+    # print(f"set_parnt_child_relation_for_assembly::counter::{counter}")
     assembly.relations = relations
 
 def get_base_entity(assembly_tree:Assembly):
@@ -630,10 +648,17 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
 
     for child in children:
         if child['assembly']:
-            print("child is assembly")
+            # print("child is assembly")
+            child['assembly']['entity'].joint =JointData(
+                child['joint']['name'],
+                child['joint']['type'],
+                child['joint']['z_axis'],
+                child['mated_entity'],
+                child['joint']['assembly_owning_feature']
+            )
             child_entitiy_node =EntityNode (
                 child['assembly']['entity'],
-                child['assembly']['entity'].e_type
+                child['assembly']['entity'].e_type,
             )
             entity_node.add_child(child_entitiy_node)
             # print(f"child is assembly::child['part']['entity']::{child['part']['entity']}")
@@ -643,7 +668,14 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
             cunstruct_relation_tree(child_entitiy_node,child['assembly']['entity'],onshape_state)
             continue
         elif child['part']:
-            print("child is part")
+            # print("child is part")
+            child['part']['entity'].joint = JointData(
+                child['joint']['name'],
+                child['joint']['type'],
+                child['joint']['z_axis'],
+                child['mated_entity'],
+                child['joint']['assembly_owning_feature']
+            )
             child_entitiy_node = EntityNode(
                 child['part']['entity'],
                 child['part']['entity'].e_type
@@ -651,9 +683,180 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
             entity_node.add_child(child_entitiy_node)
             cunstruct_relation_tree(child_entitiy_node,current_assembly,onshape_state)
 
+def get_worldAxisFrame(transform,matedEntity):
 
-def assembly_tree_to_models(assembly_tree:Assembly,
-                            onshape_state:OnshapeState):
-    pass
+    worldAxisFrame = transform * get_T_part_mate(matedEntity)
+    return worldAxisFrame
+
+
+def getLimits(jointType, name,joint_features):
+    # print(f"getLimits::jointType::{jointType}")
+    # print(f"getLimits::name::{name}")
+    # print(f"joint_features['features']::{joint_features['features']}")
+
+    enabled = False
+    minimum, maximum = 0, 0
+    for feature in joint_features['features']:
+        # Find coresponding joint
+        if name == feature['message']['name']:
+            # Find min and max values
+            for parameter in feature['message']['parameters']:
+                if parameter['message']['parameterId'] == "limitsEnabled":
+                    enabled = parameter['message']['value']
+
+                if jointType == 'revolute':
+                    if parameter['message']['parameterId'] == 'limitAxialZMin':
+                        minimum = readParameterValue(parameter, name)
+                    if parameter['message']['parameterId'] == 'limitAxialZMax':
+                        maximum = readParameterValue(parameter, name)
+                elif jointType == 'prismatic':
+                    if parameter['message']['parameterId'] == 'limitZMin':
+                        minimum = readParameterValue(parameter, name)
+                    if parameter['message']['parameterId'] == 'limitZMax':
+                        maximum = readParameterValue(parameter, name)
+    if enabled:
+        return (minimum, maximum)
+    else:
+        if jointType != 'continuous':
+            print(Fore.YELLOW + 'WARNING: joint ' + name + ' of type ' +
+                jointType + ' has no limits ' + Style.RESET_ALL)
+        return None
+
+def feature_init(fullConfiguration, workspaceId, assemblyId):
+    # Load joint features to get limits later
+    if config['versionId'] == '':
+        joint_features = client.get_features(
+            config['documentId'], workspaceId, assemblyId)
+    else:
+        joint_features = client.get_features(
+            config['documentId'], config['versionId'], assemblyId, type='v')
+
+    # Retrieving root configuration parameters
+    configuration_parameters = {}
+    parts = fullConfiguration.split(';')
+    # print(f"init::parts::{parts}")
+    for part in parts:
+        kv = part.split('=')
+        if len(kv) == 2:
+            configuration_parameters[kv[0]] = kv[1].replace('+', ' ')
+    return configuration_parameters, joint_features
+
+def get_joint_limit(joint:JointData):
+    assembly = joint.owner
+    assemblyId = assembly.element_id
+    fullConfiguration = assembly.fullConfiguration
+    document = client.get_document(assembly.document_id).json()
+    workspaceId = document["defaultWorkspace"]["id"]
+
+    configuration_parameters, joint_features = feature_init(fullConfiguration, workspaceId, assemblyId)
+
+    limit = getLimits(joint.j_type,joint.name,joint_features)
+    # print(f"get_joint_limit::joint.name::{joint.name}:: limit::{limit}")
+    return limit
+
+def entity_node_to_node(entity_node:EntityNode,
+                        graph_state:MujocoGraphState,
+                        matrix,body_pose):
+    entity = None
+    if entity_node.e_type == EntityType.PART:
+        entity = entity_node.entity
+        # print(f"part::entity::{entity.name}")
+    elif entity_node.e_type == EntityType.Assembly:
+        # print(f"assembly::entity::{entity_node.entity.name}")
+        entity = entity_node.entity.root_entity
+        if entity_node.entity.joint.name:
+            # print(f"assembly::entity::joint::name::{entity_node.entity.joint.name}")
+            # print(f"assembly::entity::joint::owner::{entity_node.entity.joint.owner}")
+            limit = get_joint_limit(entity_node.entity.joint)
+            # print(f"assembly::entity::limit::{limit}")
+
+        # print(f"part::root_entity::{entity.name}")
+        # print(f"entity_node_to_node::EntityType.Assembly::entity::{entity}")
+
+    pose = entity.occerance["transform"]
+    pose = np.linalg.inv(matrix)*pose
+    xyz,rpy,quat = transform_to_pos_and_euler(pose)
+
+    # getting info useful for geom
+    instance = entity.occerance["instance"]
+    link_name = processPartName(
+        instance['name'], instance['configuration'],
+        entity.occerance['linkName']
+    )
+    justPart, prefix,part = getMeshName(entity.occerance)
+
+    graph_state.assets.add_mesh(justPart+".stl")
+
+    rgba = get_color(part)
+
+    c_name = get_color_name(rgba)
+    graph_state.assets.add_material(c_name,rgba)
+
+    geom = Geom(
+        id = uuid4(),
+        name = justPart,
+        pos = tuple(xyz),
+        euler = tuple(rpy),
+        mesh = justPart,
+        material = Material(
+            name = c_name,
+            rgba = rgba)
+    )
+
+    # getting inertia
+    mass,intertia_props,com = get_inetia_prop(prefix,part)
+    i_prop_dic = compute_inertia(matrix,com,intertia_props)
+    inertia = Inertia(
+        pos= i_prop_dic["com"],
+        mass = mass,
+        fullinertia=i_prop_dic["inertia"]
+    )
+
+    # getting joint if any
+    joint= None
+    if entity_node.e_type == EntityType.PART:
+        if entity.joint.name:
+            # print(f"entity.joint::{entity.joint}")
+            # print(f"there is a joint::{entity.joint.name:}")
+            limits = get_joint_limit(entity.joint)
+            # print(f"limits::{limits}")
+            joint = Joint(
+                name = entity.joint.name,
+                j_type=translate_joint_type_to_mjcf(entity.joint.j_type.value),
+                j_range=limits,
+                axis=tuple(entity.joint.z_axis),
+                id = uuid4()
+            )
+    elif entity_node.e_type == EntityType.Assembly:
+        if entity_node.entity.joint.name:
+            limits = get_joint_limit(entity_node.entity.joint)
+            joint = Joint(
+                name = entity_node.entity.joint.name,
+                j_type=translate_joint_type_to_mjcf(entity_node.entity.joint.j_type.value),
+                j_range=limits,
+                axis=tuple(entity_node.entity.joint.z_axis),
+                id = uuid4()
+            )
+    if joint:
+        graph_state.joint_state.add(joint.to_dict(),joint)
+
+    body_elem = BodyElements(inertia,geom,joint)
+    node = Body(prop=body_elem,name=link_name,position=tuple(body_pose[:3]),euler=tuple(body_pose[3:]))
+
+    for child in entity_node.children:
+        ###############
+        worldAxisFrame = get_worldAxisFrame(entity.occerance["transform"],child.entity.joint.mated_entity)
+        axisFrame = np.linalg.inv(matrix)*worldAxisFrame
+        childMatrix = worldAxisFrame
+        ###############
+        xyz,rpy,quat = transform_to_pos_and_euler(axisFrame)
+
+        child_node = entity_node_to_node(child,graph_state,childMatrix, list(xyz)+list(rpy) )
+        node.add_child(child_node)
+
+    return node
+
+
+
 
 
