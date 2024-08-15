@@ -221,6 +221,7 @@ def main():
                     frame = partOrFrame
 
                 if robot.relative:
+                    print("robot.relative")
                     frame = np.linalg.inv(matrix)*frame
                 robot.addFrame(name, frame)
 
@@ -233,6 +234,7 @@ def main():
             jointLimits = child['jointLimits']
 
             if robot.relative:
+                print("robot.relative")
                 axisFrame = np.linalg.inv(matrix)*worldAxisFrame
                 childMatrix = worldAxisFrame
             else:

@@ -685,6 +685,9 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
 
 def get_worldAxisFrame(transform,matedEntity):
 
+    print(f"get_worldAxisFrame::transform::{transform}")
+    print(f"get_worldAxisFrame::matedEntity::{matedEntity}")
+
     worldAxisFrame = transform * get_T_part_mate(matedEntity)
     return worldAxisFrame
 
@@ -846,6 +849,7 @@ def entity_node_to_node(entity_node:EntityNode,
     for child in entity_node.children:
         ###############
         worldAxisFrame = get_worldAxisFrame(entity.occerance["transform"],child.entity.joint.mated_entity)
+        print(f"worldAxisFrame::{worldAxisFrame}\n\n")
         axisFrame = np.linalg.inv(matrix)*worldAxisFrame
         childMatrix = worldAxisFrame
         ###############
