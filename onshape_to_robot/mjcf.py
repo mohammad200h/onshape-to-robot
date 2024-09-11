@@ -141,15 +141,9 @@ def create_mjcf_assembly_tree(assembly:dict):
     state = OnshapeState()
 
     root = assembly["rootAssembly"]
-    subassemblies = assembly["subAssemblies"]
-    # print(f"root::{root}")
-    # print(f"subassemblies::{subassemblies}")
-
-    root_instances = root["instances"]
-    root_features = root["features"]
-
-    subassembly_instances = subassemblies[0]["instances"]
-    subassembly_features = subassemblies[0]["features"]
+    subassemblies = None
+    if len(assembly["subAssemblies"])>0:
+        subassemblies = assembly["subAssemblies"]
 
     # print(f"root_features::{root_features}")
 
@@ -323,7 +317,7 @@ def create_models(assembly_tree:Assembly,onshape_state:OnshapeState):
     # print(pretty_xml_as_string)
 
 
-    file_path = 'walker/model.xml'
+    file_path = './model.xml'
 
     with open(file_path, 'w') as file:
         file.write(pretty_xml_as_string)
