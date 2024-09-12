@@ -522,18 +522,6 @@ def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
             # print(f"dic_to_assembly::instance::id::{instance['id']}")
             # print(f"dic_to_assembly::occerance::transform::{occerance['transform']}")
 
-            document = client.get_document(instance["documentId"]).json()
-            workspaceId = document["defaultWorkspace"]["id"]
-
-            # print(f"dic_to_assembly::document::{document}")
-
-            assemblyId = instance["elementId"]
-            assembly = client.get_assembly(
-            instance["documentId"],
-            workspaceId,
-            assemblyId,
-            )
-
             # print(f"dic_to_assembly::assembly::{assembly}")
 
             assembly =  Assembly(
@@ -698,9 +686,9 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
             entity_node.add_child(child_entitiy_node)
             cunstruct_relation_tree(child_entitiy_node,current_assembly,onshape_state)
 
-def get_worldAxisFrame(occerance_path,matedEntity):
-    print(f"get_worldAxisFrame::occerance_path::{occerance_path}")
-    T_world_part = getOccurrence(matedEntity["matedOccurrence"])["transform"]
+def get_worldAxisFrame(occurrences,matedEntity):
+
+    T_world_part = occurrences[tuple(matedEntity["matedOccurrence"])]["transform"]
     print(f"MJCF::T_world_part::{T_world_part}")
 
 
@@ -784,7 +772,8 @@ def get_joint_limit(joint:JointData):
 
 def entity_node_to_node(entity_node:EntityNode,
                         graph_state:MujocoGraphState,
-                        matrix,body_pose):
+                        matrix,body_pose,
+                        occurences):
     entity = None
     if entity_node.e_type == EntityType.PART:
         entity = entity_node.entity
@@ -876,14 +865,14 @@ def entity_node_to_node(entity_node:EntityNode,
 
     for child in entity_node.children:
         ###############
-        worldAxisFrame = get_worldAxisFrame(entity.occerance["path"],child.entity.joint.mated_entity)
+        worldAxisFrame = get_worldAxisFrame(occurences,child.entity.joint.mated_entity)
         # print(f"worldAxisFrame::{worldAxisFrame}\n\n")
         axisFrame = np.linalg.inv(matrix)*worldAxisFrame
         childMatrix = worldAxisFrame
         ###############
         xyz,rpy,quat = transform_to_pos_and_euler(axisFrame)
 
-        child_node = entity_node_to_node(child,graph_state,childMatrix, list(xyz)+list(rpy) )
+        child_node = entity_node_to_node(child,graph_state,childMatrix, list(xyz)+list(rpy),occurences )
         node.add_child(child_node)
 
     return node

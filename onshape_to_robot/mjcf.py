@@ -143,26 +143,52 @@ def create_mjcf_assembly_tree(assembly:dict):
 
     root = assembly["rootAssembly"]
     subassemblies = None
-    if len(assembly["subAssemblies"])>0:
-        subassemblies = assembly["subAssemblies"]
-    # print(f"root_features::{root_features}")
-
-    # for feature in root_features:
-    #     print("\n\n")
-    #     print(f"feature::{feature}")
-    # return
-
-    # print("\n\n")
-    # print(f"root::keys::{root.keys()}")
-
     ####### This code was  copy pasted from load_robot.py ########
     # Collecting occurrences, the path is the assembly / sub assembly chain
     occurrences = {}
     for occurrence in root["occurrences"]:
+        occurrence["assignation"] = None
         occurrence["instance"] = findInstance(occurrence["path"])
         occurrence["transform"] = np.matrix(np.reshape(occurrence["transform"], (4, 4)))
-
         occurrences[tuple(occurrence["path"])] = occurrence
+
+    if len(assembly["subAssemblies"])>0:
+        subassemblies = assembly["subAssemblies"]
+        print("\n")
+        print(f"subassemblies::{subassemblies}")
+        print("\n")
+        for subassembly in subassemblies:
+            print(f"subassembly::keys::{subassembly.keys()}")
+            # getting occerance of subassembly
+            instance = subassembly['instances'][0]
+            # documentId = instance['documentId']
+            # assemblyId = instance["elementId"]
+#
+            # print(f"instance::{instance}")
+            # print(f"documentId::{documentId}")
+            # print(f"assemblyId::{assemblyId}")
+
+            document = client.get_document(subassembly["documentId"]).json()
+            workspaceId = document["defaultWorkspace"]["id"]
+
+            # # print(f"dic_to_assembly::document::{document}")
+
+            assemblyId = subassembly["elementId"]
+
+            print()
+            assembly = client.get_assembly(
+            subassembly["documentId"],
+            workspaceId,
+            assemblyId,
+            )
+
+
+            for occurrence in assembly['rootAssembly']["occurrences"]:
+                occurrence["assignation"] = None
+                occurrence["instance"] = findInstance(occurrence["path"], subassembly['instances'])
+                occurrence["transform"] = np.matrix(np.reshape(occurrence["transform"], (4, 4)))
+                occurrences[tuple(occurrence["path"])] = occurrence
+
     ###### END ########
 
     root_assemby = Assembly(
@@ -189,9 +215,9 @@ def create_mjcf_assembly_tree(assembly:dict):
     # print(f"state::parts::keys::{state.parts.keys()}")
     # print(f"state::assemblies::keys::{state.assemblies.keys()}")
 
-    return root_assemby,state
+    return root_assemby,state,occurrences
 
-def create_models(assembly_tree:Assembly,onshape_state:OnshapeState):
+def create_models(assembly_tree:Assembly,onshape_state:OnshapeState,occurences):
     print("\n")
     # print(f"assembly_tree::part::id::{[part.e_id for part in assembly_tree.parts]}")
     # print(f"assembly_tree::assembly::id::{[assembly.e_id for assembly in assembly_tree.assemblies]}")
@@ -237,7 +263,7 @@ def create_models(assembly_tree:Assembly,onshape_state:OnshapeState):
     # create_body_and_joint_poses(entitiy_node,mj_state,matrix,b_pose)
 
     # return
-    root_node = entity_node_to_node(entitiy_node,mj_state,matrix,b_pose)
+    root_node = entity_node_to_node(entitiy_node,mj_state,matrix,b_pose,occurences)
 
     # print(f"root_node::name::{root_node.name}\n")
     # print(f"root_node::prop::{root_node.prop}\n")

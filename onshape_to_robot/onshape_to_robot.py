@@ -257,9 +257,9 @@ def main():
     robot.finalize()
     # print(f"tree::{tree}")
     # print(f"tree::keys::{tree.keys()}")
-    assembly_tree,onshape_state = create_mjcf_assembly_tree(assembly)
+    assembly_tree,onshape_state,occurrences = create_mjcf_assembly_tree(assembly)
 
-    create_models(assembly_tree,onshape_state)
+    create_models(assembly_tree,onshape_state,occurrences)
 
 
     print("\n" + Style.BRIGHT + "* Writing " +
