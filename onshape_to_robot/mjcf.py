@@ -15,7 +15,8 @@ from .utility import (transform_to_pos_and_euler,
                         get_base_entity,
                         find_relation,
                         cunstruct_relation_tree,
-                        entity_node_to_node
+                        entity_node_to_node,
+                        create_body_and_joint_poses
                         )
 
 import xml.dom.minidom
@@ -144,7 +145,6 @@ def create_mjcf_assembly_tree(assembly:dict):
     subassemblies = None
     if len(assembly["subAssemblies"])>0:
         subassemblies = assembly["subAssemblies"]
-
     # print(f"root_features::{root_features}")
 
     # for feature in root_features:
@@ -234,6 +234,9 @@ def create_models(assembly_tree:Assembly,onshape_state:OnshapeState):
     # base pose
     b_pose = [0]*6
 
+    # create_body_and_joint_poses(entitiy_node,mj_state,matrix,b_pose)
+
+    # return
     root_node = entity_node_to_node(entitiy_node,mj_state,matrix,b_pose)
 
     # print(f"root_node::name::{root_node.name}\n")

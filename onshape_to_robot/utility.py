@@ -522,6 +522,20 @@ def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
             # print(f"dic_to_assembly::instance::id::{instance['id']}")
             # print(f"dic_to_assembly::occerance::transform::{occerance['transform']}")
 
+            document = client.get_document(instance["documentId"]).json()
+            workspaceId = document["defaultWorkspace"]["id"]
+
+            # print(f"dic_to_assembly::document::{document}")
+
+            assemblyId = instance["elementId"]
+            assembly = client.get_assembly(
+            instance["documentId"],
+            workspaceId,
+            assemblyId,
+            )
+
+            # print(f"dic_to_assembly::assembly::{assembly}")
+
             assembly =  Assembly(
                 e_id = instance["id"],
                 e_type =  EntityType.Assembly,
@@ -669,6 +683,7 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
             continue
         elif child['part']:
             # print("child is part")
+            print(f"MJCF::child::joint::mated_entity::{child['mated_entity']}")
             child['part']['entity'].joint = JointData(
                 child['joint']['name'],
                 child['joint']['type'],
@@ -683,12 +698,22 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
             entity_node.add_child(child_entitiy_node)
             cunstruct_relation_tree(child_entitiy_node,current_assembly,onshape_state)
 
-def get_worldAxisFrame(transform,matedEntity):
+def get_worldAxisFrame(occerance_path,matedEntity):
+    print(f"get_worldAxisFrame::occerance_path::{occerance_path}")
+    T_world_part = getOccurrence(matedEntity["matedOccurrence"])["transform"]
+    print(f"MJCF::T_world_part::{T_world_part}")
 
-    print(f"get_worldAxisFrame::transform::{transform}")
-    print(f"get_worldAxisFrame::matedEntity::{matedEntity}")
 
-    worldAxisFrame = transform * get_T_part_mate(matedEntity)
+    print(f"get_worldAxisFrame::matedEntity::id::{matedEntity}")
+    T_part_mate = get_T_part_mate(matedEntity)
+    # T_world_part = transform
+    print(f"MJCF::T_part_mate::{T_part_mate}")
+    print(f"MJCF::T_world_part::{T_world_part}")
+    # The problem is T_world_part which is different for URDF
+    T_world_mate = T_world_part * T_part_mate
+    # T_world_mate = T_world_part * T_part_mate
+    worldAxisFrame = T_world_mate
+
     return worldAxisFrame
 
 
@@ -775,10 +800,13 @@ def entity_node_to_node(entity_node:EntityNode,
 
         # print(f"part::root_entity::{entity.name}")
         # print(f"entity_node_to_node::EntityType.Assembly::entity::{entity}")
-
+    #urdf -> base link pose
     pose = entity.occerance["transform"]
     pose = np.linalg.inv(matrix)*pose
     xyz,rpy,quat = transform_to_pos_and_euler(pose)
+    # print("\n")
+    # print(f"urdf::body::entity_node_to_node::pose::{pose}")
+    # print(f"urdf::body::entity_node_to_node::xyz::{xyz}")
 
     # getting info useful for geom
     instance = entity.occerance["instance"]
@@ -848,8 +876,8 @@ def entity_node_to_node(entity_node:EntityNode,
 
     for child in entity_node.children:
         ###############
-        worldAxisFrame = get_worldAxisFrame(entity.occerance["transform"],child.entity.joint.mated_entity)
-        print(f"worldAxisFrame::{worldAxisFrame}\n\n")
+        worldAxisFrame = get_worldAxisFrame(entity.occerance["path"],child.entity.joint.mated_entity)
+        # print(f"worldAxisFrame::{worldAxisFrame}\n\n")
         axisFrame = np.linalg.inv(matrix)*worldAxisFrame
         childMatrix = worldAxisFrame
         ###############
@@ -860,6 +888,37 @@ def entity_node_to_node(entity_node:EntityNode,
 
     return node
 
+def create_body_and_joint_poses(entity_node:EntityNode,
+                        graph_state:MujocoGraphState,
+                        matrix,body_pose):
+
+    entity = None
+    if entity_node.e_type == EntityType.PART:
+        entity = entity_node.entity
+    elif entity_node.e_type == EntityType.Assembly:
+        entity = entity_node.entity.root_entity
+        if entity_node.entity.joint.name:
+            limit = get_joint_limit(entity_node.entity.joint)
+
+    pose = entity.occerance["transform"]
+    pose = np.linalg.inv(matrix)*pose
+    xyz,rpy,quat = transform_to_pos_and_euler(pose)
+
+    # print("\n")
+    # print(f"xyz::{xyz}")
+    # print(f"rpy::{rpy}")
+
+
+    for child in entity_node.children:
+        # print(f"MJCF::child::{child}")
+        worldAxisFrame = get_worldAxisFrame(entity.occerance["transform"],child.entity.joint.mated_entity)
+        # print(f"MJCF::worldAxisFrame::{worldAxisFrame}\n\n")
+        axisFrame = np.linalg.inv(matrix)*worldAxisFrame
+        childMatrix = worldAxisFrame
+        ###############
+        xyz,rpy,quat = transform_to_pos_and_euler(axisFrame)
+
+        child_node = create_body_and_joint_poses(child,graph_state,childMatrix, list(xyz)+list(rpy) )
 
 
 

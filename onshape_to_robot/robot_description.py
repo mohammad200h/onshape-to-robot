@@ -267,6 +267,9 @@ class RobotURDF(RobotDescription):
 
         material_name = name + "_material"
         material_name = xml_escape(material_name)
+        print("\n")
+        print(f"RobotURDF::addSTL::matrix::{matrix}")
+        print(f"RobotURDF::addSTL::origin::{origin(matrix)}")
 
         self.append('<'+node+'>')
         self.append(origin(matrix))
@@ -296,7 +299,6 @@ class RobotURDF(RobotDescription):
             if self.drawCollisions:
                 entries.append('visual')
             for entry in entries:
-
                 if shapes is None:
                     # We don't have pure shape, we use the mesh
                     if self.shouldMergeSTLs(entry):
@@ -333,6 +335,7 @@ class RobotURDF(RobotDescription):
 
     def addJoint(self, jointType, linkFrom, linkTo, transform, name, jointLimits, zAxis=[0, 0, 1]):
         self.append('<joint name="'+name+'" type="'+jointType+'">')
+        print(f"RobotURDF::addJoint::origin::{origin(transform)}")
         self.append(origin(transform))
         self.append('<parent link="'+linkFrom+'" />')
         self.append('<child link="'+linkTo+'" />')

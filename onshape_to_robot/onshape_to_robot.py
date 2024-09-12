@@ -228,7 +228,9 @@ def main():
         # Following the children in the tree, calling this function recursively
         k = 0
         for child in tree['children']:
+            print(f"urdf::child::{child}")
             worldAxisFrame = child['axis_frame']
+            print(f"urdf::worldAxisFrame::{worldAxisFrame}")
             zAxis = child['z_axis']
             jointType = child['jointType']
             jointLimits = child['jointLimits']
