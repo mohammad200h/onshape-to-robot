@@ -741,8 +741,8 @@ def get_worldAxisFrame(occurrences,matedEntity):
 
 def getLimits(jointType, name,joint_features):
 
-    print(f"joint_features::{joint_features}")
-
+    # print(f"joint_features::{joint_features}")
+    print(f"getLimits::jointType::{jointType}")
     enabled = False
     minimum, maximum = 0, 0
     for feature in joint_features['features']:
@@ -967,6 +967,7 @@ def part_trees_to_node(part,matrix,body_pose,graph_state:MujocoGraphState):
     joint= None
     if part.joint:
         limits = get_joint_limit2(part.joint)
+        print(f"limits::{limits}")
         joint = Joint(
                 name = part.joint.name,
                 j_type=translate_joint_type_to_mjcf(part.joint.j_type.lower()),

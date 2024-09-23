@@ -265,12 +265,13 @@ def get_part_transforms_and_fetures(assembly:dict):
             for feature in asm['features']:
               child = feature['featureData']['matedEntities'][0]['matedOccurrence']
               parent = feature['featureData']['matedEntities'][1]['matedOccurrence']
-              assembly_info['assemblyId']= asm['elementId']
+              subassembly_info = assembly_info.copy()
+              subassembly_info['assemblyId']= asm['elementId']
               relation = {
                 'child':child,
                 'parent':parent,
                 'feature':feature,
-                'assemblyInfo':assembly_info
+                'assemblyInfo':subassembly_info
               }
               subassembly_relations.append(relation)
         relations_that_belong_to_assembly[idx]["replacement"] = subassembly_relations
@@ -319,9 +320,10 @@ def create_parts_tree(root_part, part_instance,
             occ = find_occurence(assembly["rootAssembly"]['occurrences'],
                         child
             )
-            # print("\n")
-            # print(f"feature::{feature}")
-            # print("\n")
+            print("\n")
+            print(f"assemblyInfo::{assemblyInfo}")
+            print("\n")
+
             j = JointData2(
                 name = feature['featureData']['name'],
                 j_type = feature['featureData']['mateType'],
