@@ -8,6 +8,7 @@ import numpy as np
 from .load_robot import \
      config, client, tree, occurrences, getOccurrence, frames,get_T_part_mate
 
+from .features import readParameterValue
 
 from .onshape_mjcf import ( Entity,
                             EntityType,
@@ -477,7 +478,7 @@ def find_occerance_key(occurrences,instance_id):
     for key in occurrences.keys():
         if instance_id in key:
             return key
-    reutrn ()
+    return None
 
 def dic_to_assembly(state:OnshapeState,assembly_dic:dict,occurrences:dict,
                     sub_assemblies:dict,root_assemby:Assembly):
@@ -686,9 +687,43 @@ def cunstruct_relation_tree(entity_node:EntityNode,current_assembly:Assembly,ons
             entity_node.add_child(child_entitiy_node)
             cunstruct_relation_tree(child_entitiy_node,current_assembly,onshape_state)
 
-def get_worldAxisFrame(occurrences,matedEntity):
+def get_worldAxisFrame2(part):
 
-    T_world_part = occurrences[tuple(matedEntity["matedOccurrence"])]["transform"]
+
+    T_world_part = part.transform
+    print(f"MJCF::T_world_part::{T_world_part}")
+
+
+    print(f"get_worldAxisFrame2::part.joint.feature['featureData']::{part.joint.feature['featureData']}")
+    T_part_mate = get_T_part_mate(part.joint.feature['featureData']['matedEntities'][0])
+    # T_world_part = transform
+    print(f"MJCF::T_part_mate::{T_part_mate}")
+    print(f"MJCF::T_world_part::{T_world_part}")
+    # The problem is T_world_part which is different for URDF
+    T_world_mate = T_world_part * T_part_mate
+    # T_world_mate = T_world_part * T_part_mate
+    worldAxisFrame = T_world_mate
+
+    return worldAxisFrame
+
+def get_worldAxisFrame(occurrences,matedEntity):
+    print(f"get_worldAxisFrame::matedEntity::{matedEntity}")
+    matedOccurrence = tuple(matedEntity["matedOccurrence"])
+    root_id ='030d70476fdd8a6377c2a5dc'
+    occ_key = root_id+"_"+"_".join(matedOccurrence)
+    print(f"get_worldAxisFrame::occ_key::{occ_key}")
+    print("\n")
+    for key,value in occurrences.items():
+        if key == occ_key:
+            print(f"Found it::{matedOccurrence}")
+            print(f"occurrenc::{occurrences[occ_key]}")
+
+
+    print("\n")
+    print(f"get_worldAxisFrame:occurrences::keys::{occurrences.keys()}")
+    print(f"get_worldAxisFrame::occurrences[occ_key]::{occurrences[occ_key]}")
+
+    T_world_part = occurrences[occ_key]["transform"]
     print(f"MJCF::T_world_part::{T_world_part}")
 
 
@@ -704,11 +739,9 @@ def get_worldAxisFrame(occurrences,matedEntity):
 
     return worldAxisFrame
 
-
 def getLimits(jointType, name,joint_features):
-    # print(f"getLimits::jointType::{jointType}")
-    # print(f"getLimits::name::{name}")
-    # print(f"joint_features['features']::{joint_features['features']}")
+
+    print(f"joint_features::{joint_features}")
 
     enabled = False
     minimum, maximum = 0, 0
@@ -768,6 +801,21 @@ def get_joint_limit(joint:JointData):
 
     limit = getLimits(joint.j_type,joint.name,joint_features)
     # print(f"get_joint_limit::joint.name::{joint.name}:: limit::{limit}")
+    return limit
+
+def get_joint_limit2(joint):
+    assembly_info = joint.assemblyInfo
+    document = client.get_document(assembly_info['documentId']).json()
+    workspaceId = document["defaultWorkspace"]["id"]
+
+    configuration_parameters, joint_features = feature_init(
+        assembly_info['fullConfiguration'],
+        workspaceId,
+        assembly_info['assemblyId']
+        )
+    # print(f"get_joint_limit2::joint_features::{joint_features}")
+
+    limit = getLimits(joint.j_type.lower(),joint.name,joint_features)
     return limit
 
 def entity_node_to_node(entity_node:EntityNode,
@@ -877,38 +925,70 @@ def entity_node_to_node(entity_node:EntityNode,
 
     return node
 
-def create_body_and_joint_poses(entity_node:EntityNode,
-                        graph_state:MujocoGraphState,
-                        matrix,body_pose):
+def part_trees_to_node(part,matrix,body_pose,graph_state:MujocoGraphState):
 
-    entity = None
-    if entity_node.e_type == EntityType.PART:
-        entity = entity_node.entity
-    elif entity_node.e_type == EntityType.Assembly:
-        entity = entity_node.entity.root_entity
-        if entity_node.entity.joint.name:
-            limit = get_joint_limit(entity_node.entity.joint)
-
-    pose = entity.occerance["transform"]
+    pose = part.transform
     pose = np.linalg.inv(matrix)*pose
     xyz,rpy,quat = transform_to_pos_and_euler(pose)
 
-    # print("\n")
-    # print(f"xyz::{xyz}")
-    # print(f"rpy::{rpy}")
+    instance = part.occurence["instance"]
+    link_name = processPartName(
+        instance['name'], instance['configuration'],
+        part.occurence['linkName']
+    )
+    justPart, prefix,part_ = getMeshName(part.occurence)
 
+    graph_state.assets.add_mesh(justPart+".stl")
 
-    for child in entity_node.children:
-        # print(f"MJCF::child::{child}")
-        worldAxisFrame = get_worldAxisFrame(entity.occerance["transform"],child.entity.joint.mated_entity)
-        # print(f"MJCF::worldAxisFrame::{worldAxisFrame}\n\n")
+    rgba = get_color(part_)
+
+    c_name = get_color_name(rgba)
+    graph_state.assets.add_material(c_name,rgba)
+
+    geom = Geom(
+        id = uuid4(),
+        name = justPart,
+        pos = tuple(xyz),
+        euler = tuple(rpy),
+        mesh = justPart,
+        material = Material(
+            name = c_name,
+            rgba = rgba)
+    )
+
+    # getting inertia
+    mass,intertia_props,com = get_inetia_prop(prefix,part_)
+    i_prop_dic = compute_inertia(matrix,com,intertia_props)
+    inertia = Inertia(
+        pos= i_prop_dic["com"],
+        mass = mass,
+        fullinertia=i_prop_dic["inertia"]
+    )
+    joint= None
+    if part.joint:
+        limits = get_joint_limit2(part.joint)
+        joint = Joint(
+                name = part.joint.name,
+                j_type=translate_joint_type_to_mjcf(part.joint.j_type.lower()),
+                j_range=limits,
+                axis=tuple(part.joint.z_axis),
+                id = uuid4()
+            )
+        graph_state.joint_state.add(joint.to_dict(),joint)
+
+    body_elem = BodyElements(inertia,geom,joint)
+    node = Body(prop=body_elem,name=link_name,position=tuple(body_pose[:3]),euler=tuple(body_pose[3:]))
+
+    for child in part.children:
+        ###############
+        worldAxisFrame = get_worldAxisFrame2(child)
+        # print(f"worldAxisFrame::{worldAxisFrame}\n\n")
         axisFrame = np.linalg.inv(matrix)*worldAxisFrame
         childMatrix = worldAxisFrame
         ###############
         xyz,rpy,quat = transform_to_pos_and_euler(axisFrame)
 
-        child_node = create_body_and_joint_poses(child,graph_state,childMatrix, list(xyz)+list(rpy) )
+        child_node = part_trees_to_node(child,childMatrix, list(xyz)+list(rpy),graph_state )
+        node.add_child(child_node)
 
-
-
-
+    return node

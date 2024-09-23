@@ -9,16 +9,25 @@ import hashlib
 from . import csg
 from .robot_description import RobotURDF, RobotSDF
 
-from .mjcf import create_mjcf,create_mjcf_assembly_tree,create_models
+from .mjcf import (create_mjcf,
+                   create_mjcf_assembly_tree,
+                   create_models,get_part_transforms_and_fetures,
+                   create_parts_tree,
+                   find_occurence,
+                   create_models_using_part_tree
+)
 
 
 partNames = {}
 
 def main():
     # Loading configuration, collecting occurrences and building robot tree
-    from .load_robot import \
-        config, client, tree, occurrences, getOccurrence, frames,assembly
-
+    from .load_robot import (
+        config, client,
+        tree,findInstance,
+        occurrences, getOccurrence,
+        frames,assembly
+    )
 
     # Creating robot for output
     if config['outputFormat'] == 'urdf':
@@ -255,12 +264,18 @@ def main():
     # Start building the robot
     buildRobot(tree, np.matrix(np.identity(4)))
     robot.finalize()
+
+    ####### Simple approach #########
+    create_models_using_part_tree(assembly)
+
+    #################################
+
+
     # print(f"tree::{tree}")
     # print(f"tree::keys::{tree.keys()}")
-    assembly_tree,onshape_state,occurrences = create_mjcf_assembly_tree(assembly)
+    # assembly_tree,onshape_state,occurrences = create_mjcf_assembly_tree(assembly)
 
-    create_models(assembly_tree,onshape_state,occurrences)
-
+    # create_models(assembly_tree,onshape_state,occurrences)
 
     print("\n" + Style.BRIGHT + "* Writing " +
         robot.ext.upper()+" file" + Style.RESET_ALL)
