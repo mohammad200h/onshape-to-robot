@@ -53,11 +53,32 @@ def get_part_relations(relations,instance_id):
             children.append(r)
     return children
 
+def find_occurrence(occurences,occurence_path):
+  # assuming that that we are dealing with a part that belong to sub assemblies:
+  # occurence_path: [part_instance, assembly_instance]
+  # assuming that we are in the root assembly
+  # occurence path: [part_instance]
+
+
+#   print("####### Understaidning Occurence #########")
+#     for occ in occurences:
+#         if occ['path']==['MWgdS8yELuEC57GO0']:
+#             print(f"occ::MWgdS8yELuEC57GO0::{occ}")
+#         elif
+
+#   print("####### End::Understaidning Occurence #########")
+  print(f"occurence_path::{occurence_path}")
+  for occ in occurences:
+    print(f"occ['path']::{occ['path']}")
+    if occ["path"] == occurence_path:
+      return occ
+
 def find_occurence(occurences,instanceId:str):
+    # I need to rewrite this so that it considers both part and sub-assembly instance.
     for occ in occurences:
-        instance = findInstance(occ["path"])
-        if instance["id"]== instanceId:
-            return occ
+      instance = findInstance(occ["path"])
+      if instance["id"]== instanceId:
+        return occ
 
 def create_mjcf(tree:dict)->str:
 
@@ -170,6 +191,7 @@ def get_part_transforms_and_fetures(assembly:dict):
 
     if len(assembly["subAssemblies"])>0:
         subassemblies = assembly["subAssemblies"]
+        # print(f"get_part_transforms_and_fetures::subassemblies::{subassemblies}")
 
     occurences_in_root = {
         "robot_base":None,
@@ -192,13 +214,13 @@ def get_part_transforms_and_fetures(assembly:dict):
 
         if typee == "Assembly":
           data = {
-          "documentId":occurrence['instance']['documentId'],
-          "elementId":occurrence['instance']['elementId']
+            "documentId":occurrence['instance']['documentId'],
+            "elementId":occurrence['instance']['elementId']
           }
           occurences_in_root['sub-assemblies'][occurrence['path'][0]] = data
         elif typee == 'Part':
           occurences_in_root['parts'].append(occurrence['path'])
-
+    # print(f"occurences_in_root['sub-assemblies']::{occurences_in_root['sub-assemblies']}")
     # recording parts in root assembly that belong to sub assembly
     for subassembly in occurences_in_root['sub-assemblies']:
       for part in occurences_in_root['parts']:
@@ -212,22 +234,27 @@ def get_part_transforms_and_fetures(assembly:dict):
           }
           occurences_in_root['sub_assembly_parts'].append(data)
 
-
-
     relations = []
     relations_that_belong_to_assembly = []
     # root features:
 
+    # print(f"root['features']::len::{len(root['features'])}")
+
     for idx,feature in enumerate(root['features']):
         child = feature['featureData']['matedEntities'][0]['matedOccurrence']
         parent = feature['featureData']['matedEntities'][1]['matedOccurrence']
-
+        assemblyInstanceId = None
+        if len(child)>0:
+            assemblyInstanceId = child[0]
         relation = {
           'child':child,
           'parent':parent,
           'feature':feature,
-          'assemblyInfo':assembly_info
+          'assemblyInfo':assembly_info,
+          'assemblyInstanceId':assemblyInstanceId
         }
+        print(f"mjcf::parent::{parent}")
+        print(f"mjcf::child::{child}")
 
         relations.append(relation)
         # when two ids are in an array one belong to sub assembly
@@ -235,6 +262,7 @@ def get_part_transforms_and_fetures(assembly:dict):
         # the second one represent the part
         child_is_part_of_subassembly = len(child)>1
         if child_is_part_of_subassembly:
+        #   print(f"get_part_transforms_and_fetures::feature::{feature}")
           for id in child:
             if id in occurences_in_root['sub-assemblies'].keys():
               root_part = child[:]
@@ -264,6 +292,8 @@ def get_part_transforms_and_fetures(assembly:dict):
           if expected_element_id == asm['elementId']:
             for feature in asm['features']:
               child = feature['featureData']['matedEntities'][0]['matedOccurrence']
+              if len(child)>1:
+                assemblyInstanceId = child[0]
               parent = feature['featureData']['matedEntities'][1]['matedOccurrence']
               subassembly_info = assembly_info.copy()
               subassembly_info['assemblyId']= asm['elementId']
@@ -271,7 +301,8 @@ def get_part_transforms_and_fetures(assembly:dict):
                 'child':child,
                 'parent':parent,
                 'feature':feature,
-                'assemblyInfo':subassembly_info
+                'assemblyInfo':subassembly_info,
+                'assemblyInstanceId':expected_instance_id
               }
               subassembly_relations.append(relation)
         relations_that_belong_to_assembly[idx]["replacement"] = subassembly_relations
@@ -293,8 +324,22 @@ def get_part_transforms_and_fetures(assembly:dict):
       # by removing assembly name form relation
       relations[insert_position]['child'] = relations[insert_position]['child'][1:]
 
-    # print(f"after::relations::{relations}")
     occurences_in_root["relations"] = relations
+    # print(f"after::relations::len::{len(relations)}")
+    print(f"occurences_in_root['sub_assembly_parts']::len::{len(occurences_in_root['sub_assembly_parts'])}")
+    # print(f"occurences_in_root['sub_assembly_parts']::{occurences_in_root['sub_assembly_parts']}")
+    # print(f"occurences_in_root['parts']::len::{len(occurences_in_root['parts'])}")
+    # print(f"relations_that_belong_to_assembly::len::{len(relations_that_belong_to_assembly)}")
+
+    for part in occurences_in_root['parts']:
+      print(f"part::{part}")
+    for relation in relations:
+      print("\n")
+      print(f"relation::{relation}")
+      print("\n")
+
+    # for occ in assembly['rootAssembly']['occurrences']:
+    #   print(f"occ::path::{occ['path']}")
 
     return occurences_in_root
 
@@ -316,10 +361,21 @@ def create_parts_tree(root_part, part_instance,
 
             feature = relation['feature']
             assemblyInfo = relation['assemblyInfo']
+            assemblyInstanceId = relation['assemblyInstanceId']
+            print(f"create_parts_tree::assemblyInstanceId::{assemblyInstanceId}")
             child = relation['child'][0]
-            occ = find_occurence(assembly["rootAssembly"]['occurrences'],
-                        child
-            )
+            path = []
+            if assemblyInstanceId:
+              path.append(assemblyInstanceId)
+            path.append(child)
+            print(f"path::{path}")
+            # this is where it is failing
+            # it seems findInstance that is used inside find_occurence returns the first part that it finds
+            # it does not return an instance of part specific to a specific assembly
+            # occ = find_occurence(assembly["rootAssembly"]['occurrences'],
+            #             child
+            # )
+            occ = find_occurrence(assembly["rootAssembly"]['occurrences'],path)
             print("\n")
             print(f"assemblyInfo::{assemblyInfo}")
             print("\n")
@@ -345,7 +401,6 @@ def create_parts_tree(root_part, part_instance,
 def create_mjcf_assembly_tree(assembly:dict):
 
     # print(f"config::{config}")
-
     state = OnshapeState()
 
     root = assembly["rootAssembly"]
