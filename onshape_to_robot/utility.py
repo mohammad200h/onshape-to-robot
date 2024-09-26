@@ -691,14 +691,14 @@ def get_worldAxisFrame2(part):
 
 
     T_world_part = part.transform
-    print(f"MJCF::T_world_part::{T_world_part}")
+    # print(f"MJCF::T_world_part::{T_world_part}")
 
 
-    print(f"get_worldAxisFrame2::part.joint.feature['featureData']::{part.joint.feature['featureData']}")
+    # print(f"get_worldAxisFrame2::part.joint.feature['featureData']::{part.joint.feature['featureData']}")
     T_part_mate = get_T_part_mate(part.joint.feature['featureData']['matedEntities'][0])
     # T_world_part = transform
-    print(f"MJCF::T_part_mate::{T_part_mate}")
-    print(f"MJCF::T_world_part::{T_world_part}")
+    # print(f"MJCF::T_part_mate::{T_part_mate}")
+    # print(f"MJCF::T_world_part::{T_world_part}")
     # The problem is T_world_part which is different for URDF
     T_world_mate = T_world_part * T_part_mate
     # T_world_mate = T_world_part * T_part_mate

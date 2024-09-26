@@ -192,9 +192,9 @@ def findInstance(path, instances=None):
 
 # Collecting occurrences, the path is the assembly / sub assembly chain
 occurrences = {}
-print(f"root::occurrences::{root['occurrences']}")
+# print(f"root::occurrences::{root['occurrences']}")
 for occurrence in root["occurrences"]:
-    print(f"urdf::path::{occurrence['path']}")
+    # print(f"urdf::path::{occurrence['path']}")
     occurrence["assignation"] = None
     occurrence["instance"] = findInstance(occurrence["path"])
     occurrence["transform"] = np.matrix(np.reshape(occurrence["transform"], (4, 4)))
@@ -345,12 +345,12 @@ for feature in features:
             # jointToPart is the (rotation only) matrix from joint to the part
             # it is attached to
             T_part_mate = get_T_part_mate(matedEntity)
-            print(f"urdf::matedEntity::id::{matedEntity}")
-            print(f"urdf::T_part_mate::{T_part_mate}")
-            print(f"urdf::T_world_part::{T_world_part}")
+            # print(f"urdf::matedEntity::id::{matedEntity}")
+            # print(f"urdf::T_part_mate::{T_part_mate}")
+            # print(f"urdf::T_world_part::{T_world_part}")
 
             if data["inverted"]:
-                print("T_part_mate::inverted")
+                # print("T_part_mate::inverted")
                 if limits is not None:
                     limits = (-limits[1], -limits[0])
 

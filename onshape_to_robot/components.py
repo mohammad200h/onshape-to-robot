@@ -346,7 +346,7 @@ class Inertia:
         return f"<inertial pos='{to_str(self.pos)}' mass='{self.mass}'  fullinertia='{self.fullinertia_str()}' />"
 
     def fullinertia_str(self):
-        print(f"Inertia::fullinertia_str::self.fullinertia::{self.fullinertia}")
+        # print(f"Inertia::fullinertia_str::self.fullinertia::{self.fullinertia}")
         i_mat = np.array(self.fullinertia).reshape((3,3))
         i_str = f"{i_mat[0,0]} {i_mat[1,1]} {i_mat[2,2]} {i_mat[0,1]} {i_mat[0,2]} {i_mat[1,2]}"
 
@@ -392,7 +392,7 @@ class Body(Node):
 
         body_angle = ""
 
-        print(f"Body::xml::name::{self.name}::quat::{self.quat}")
+        # print(f"Body::xml::name::{self.name}::quat::{self.quat}")
 
 
         if self.euler:

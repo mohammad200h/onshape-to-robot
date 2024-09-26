@@ -11,7 +11,7 @@ from .robot_description import RobotURDF, RobotSDF
 
 from .mjcf import (create_mjcf,
                    create_mjcf_assembly_tree,
-                   create_models,get_part_transforms_and_fetures,
+                   create_models,
                    create_parts_tree,
                    find_occurence,
                    create_models_using_part_tree
@@ -230,22 +230,22 @@ def main():
                     frame = partOrFrame
 
                 if robot.relative:
-                    print("robot.relative")
+                    # print("robot.relative")
                     frame = np.linalg.inv(matrix)*frame
                 robot.addFrame(name, frame)
 
         # Following the children in the tree, calling this function recursively
         k = 0
         for child in tree['children']:
-            print(f"urdf::child::{child}")
+            # print(f"urdf::child::{child}")
             worldAxisFrame = child['axis_frame']
-            print(f"urdf::worldAxisFrame::{worldAxisFrame}")
+            # print(f"urdf::worldAxisFrame::{worldAxisFrame}")
             zAxis = child['z_axis']
             jointType = child['jointType']
             jointLimits = child['jointLimits']
 
             if robot.relative:
-                print("robot.relative")
+                # print("robot.relative")
                 axisFrame = np.linalg.inv(matrix)*worldAxisFrame
                 childMatrix = worldAxisFrame
             else:
