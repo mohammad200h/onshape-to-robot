@@ -497,6 +497,8 @@ class MujocoGraphState:
        - same is true for mesh
 
     """
+    #used for making sure joints have unique names
+    joint_names = {}
     # used for defaults managment
     joint_state = ElementState()
     geom_state  = ElementState()
@@ -735,6 +737,12 @@ def refactor_geom(tree:Body,graph_state:MujocoGraphState):
 
     return attribiutes_common_in_all_elements_with_ids,classes
 
+def get_joint_name(joint_name,graph_state:MujocoGraphState):
+    if joint_name in graph_state.joint_names.keys():
+        graph_state.joint_names[joint_name] +=1
+    else:
+        graph_state.joint_names[joint_name] = 1
+    return joint_name + str(graph_state.joint_names[joint_name])
 """
   Thought : I yet dont how to set actuator,Light,Camera,Contact Exclude values from Onshape
   Possible solutions:

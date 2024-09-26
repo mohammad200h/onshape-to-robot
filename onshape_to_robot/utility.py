@@ -2,7 +2,8 @@ from typing import List,Dict,Any
 from .components import (Body,Geom,Joint,Inertia,
                         BodyElements,
                         Material,
-                        MujocoGraphState)
+                        MujocoGraphState,
+                        get_joint_name)
 import math
 import numpy as np
 from .load_robot import \
@@ -957,6 +958,7 @@ def part_trees_to_node(part,matrix,body_pose,graph_state:MujocoGraphState):
     )
 
     # getting inertia
+    #TODO: Inertia computation is going wrong
     mass,intertia_props,com = get_inetia_prop(prefix,part_)
     i_prop_dic = compute_inertia(matrix,com,intertia_props)
     inertia = Inertia(
@@ -966,10 +968,17 @@ def part_trees_to_node(part,matrix,body_pose,graph_state:MujocoGraphState):
     )
     joint= None
     if part.joint:
+        #TODO Limit is computed as none at the moment
+        # This probably has to do with wrong joint info
+        # not finding the right assembly therefore feature information
+        # comes out wrong
+        joint_name = get_joint_name(part.joint.name,graph_state)
         limits = get_joint_limit2(part.joint)
         print(f"limits::{limits}")
         joint = Joint(
-                name = part.joint.name,
+                # joint names are not unique this due to repeated sub-assembly
+                # need to find a way to generate unique names
+                name = joint_name,
                 j_type=translate_joint_type_to_mjcf(part.joint.j_type.lower()),
                 j_range=limits,
                 axis=tuple(part.joint.z_axis),
